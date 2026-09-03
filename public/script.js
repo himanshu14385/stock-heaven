@@ -35,7 +35,7 @@ async function analyzeStock() {
            All other stocks/ETFs still require 200 days.
         */
         const minimumDaysByStock = {
-            NIFTYCASE: 100,
+            NIFTYCASE: 50,
         };
 
         const minimumDays =
