@@ -11,7 +11,8 @@ async function analyzeStock() {
 
     try {
 
-        const url = `http://65.0.104.9/stock?symbol=${stock}&res=num`;
+        // Cloudflare Worker API
+        const url = `/api/stock?symbol=${encodeURIComponent(stock)}`;
 
         const response = await fetch(url);
 
@@ -21,35 +22,70 @@ async function analyzeStock() {
 
         console.log("API RESULT:", result);
 
-        if (result.status !== "success") {
-            throw new Error("Stock not found");
+        if (!response.ok || result.error) {
+            throw new Error(result.error || "Stock not found");
         }
 
-        const data = result.data;
+        // =========================
+        // STOCK OVERVIEW
+        // =========================
 
         document.getElementById("stockSymbol").textContent =
-            data.company_name || stock;
+            result.symbol || stock;
+
+        document.getElementById("stockExchange").textContent =
+            result.exchange || "NSE";
 
         document.getElementById("stockPrice").textContent =
-            Number(data.last_price).toLocaleString("en-IN");
+            `₹${Number(result.price).toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })}`;
+
+        const change = Number(result.change || 0);
+        const percentChange = Number(result.percent_change || 0);
 
         document.getElementById("stockChange").textContent =
-            `${data.percent_change}%`;
+            `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${percentChange >= 0 ? "+" : ""}${percentChange.toFixed(2)}%)`;
 
-        alert(
-            `API Working!\n\n` +
-            `${data.company_name}\n` +
-            `Price: ₹${data.last_price}\n` +
-            `Change: ${data.percent_change}%`
-        );
+        // =========================
+        // INDICATORS
+        // =========================
+
+        document.getElementById("volume").textContent =
+            result.volume
+                ? Number(result.volume).toLocaleString("en-IN")
+                : "-";
+
+        document.getElementById("high52").textContent =
+            result.year_high
+                ? `₹${Number(result.year_high).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })}`
+                : "-";
+
+        console.log("Price:", result.price);
+        console.log("Change:", result.change);
+        console.log("52W High:", result.year_high);
+        console.log("52W Low:", result.year_low);
+        console.log("Volume:", result.volume);
+        console.log("History:", result.history);
+
+        // =========================
+        // TEMPORARY STATUS
+        // =========================
+
+        document.getElementById("signal").textContent =
+            "LIVE DATA";
 
     } catch (error) {
 
         console.error("API ERROR:", error);
 
         alert(
-            "API browser se access nahi ho pa rahi.\n\n" +
-            "F12 → Console mein error check karo."
+            "Stock data load nahi ho paaya.\n\n" +
+            "Symbol check karo aur dobara try karo."
         );
     }
 }
