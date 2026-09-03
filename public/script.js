@@ -1578,3 +1578,26 @@ function quickSelectStock(symbol) {
 
     analyzeStock();
 }
+
+
+/* =========================
+   OPEN STOCK FROM STUCK STOCK SEARCH
+========================= */
+document.addEventListener("DOMContentLoaded", function () {
+    const params = new URLSearchParams(window.location.search);
+    const symbol = params.get("symbol");
+
+    if (symbol) {
+        const input = document.getElementById("stockInput");
+
+        if (input) {
+            input.value = symbol.toUpperCase();
+
+            setTimeout(function () {
+                if (typeof analyzeStock === "function") {
+                    analyzeStock();
+                }
+            }, 100);
+        }
+    }
+});

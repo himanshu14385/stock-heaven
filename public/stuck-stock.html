@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Stuck Stock • Stock Heaven</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="stuck-stock.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+</head>
+
+<body>
+
+<div class="page">
+
+    <header class="top-header">
+
+        <div class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+
+            <div>
+                <h1>Stock Heaven</h1>
+                <p>Smart Stock Analysis</p>
+            </div>
+        </div>
+
+    </header>
+
+    <nav class="main-nav">
+
+        <div class="nav-inner">
+
+            <a href="index.html#dashboard" class="nav-item">
+                <i class="fa-solid fa-house"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="index.html#keypoints" class="nav-item">
+                <i class="fa-solid fa-bolt"></i>
+                <span>Key Points</span>
+            </a>
+
+            <a href="index.html#technicals" class="nav-item">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Technicals</span>
+            </a>
+
+            <a href="index.html#fundamentals" class="nav-item">
+                <i class="fa-solid fa-building"></i>
+                <span>Fundamentals</span>
+            </a>
+
+            <a href="index.html#valuation" class="nav-item">
+                <i class="fa-solid fa-scale-balanced"></i>
+                <span>Valuation</span>
+            </a>
+
+            <a href="index.html#risk" class="nav-item">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>Risk</span>
+            </a>
+
+            <a href="index.html#news" class="nav-item">
+                <i class="fa-regular fa-newspaper"></i>
+                <span>News</span>
+            </a>
+
+            <a href="stuck-stock.html" class="nav-item active">
+                <i class="fa-solid fa-thumbtack"></i>
+                <span>Stuck Stock</span>
+            </a>
+
+        </div>
+
+    </nav>
+
+    <!-- SEARCH -->
+    <section class="search-section">
+
+        <div class="search-wrapper">
+
+            <div class="search-box">
+
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <input
+                    type="text"
+                    id="stuckSearchInput"
+                    placeholder="Search stock name or symbol..."
+                    autocomplete="off"
+                    onkeydown="handleStuckSearch(event)"
+                >
+
+            </div>
+
+        </div>
+
+        <button
+            class="analyze-btn"
+            onclick="searchFromStuckPage()"
+        >
+            <i class="fa-solid fa-chart-line"></i>
+            Analyze
+        </button>
+
+    </section>
+
+    <!-- STUCK STOCK ONLY -->
+    <main class="stuck-page-content">
+
+        <section class="card stuck-stock-card">
+
+            <div class="stuck-heading">
+
+                <div>
+                    <div class="section-title">
+                        <i class="fa-solid fa-thumbtack"></i>
+                        <h2>Stuck Stock</h2>
+                    </div>
+
+                    <p class="stuck-description">
+                        Stocks and ETFs you are currently tracking.
+                    </p>
+                </div>
+
+                <button
+                    class="stuck-refresh"
+                    onclick="loadStuckStocks()"
+                    title="Refresh prices"
+                >
+                    <i class="fa-solid fa-rotate"></i>
+                    Refresh
+                </button>
+
+            </div>
+
+            <div id="stuckStockList" class="stuck-stock-list">
+
+                <div class="stuck-loading">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    Loading prices...
+                </div>
+
+            </div>
+
+            <div id="stuckUpdated" class="stuck-updated">
+                Updating prices...
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <p>
+            Stock Heaven • Stuck Stock watchlist
+        </p>
+    </footer>
+
+</div>
+
+<script src="stuck-stock.js"></script>
+
+</body>
+</html>
