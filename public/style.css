@@ -1140,8 +1140,8 @@ footer {
 .side-stocks {
     position: fixed;
     top: 150px;
-    left: calc(50% - 590px - 245px);
-    width: 245px;
+    left: calc(50% - 590px - 345px);
+    width: 345px;
     background: #ffffff;
     border: 1px solid #e8ebf1;
     border-radius: 14px;
