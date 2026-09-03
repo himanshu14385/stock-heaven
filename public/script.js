@@ -34,17 +34,16 @@ async function analyzeStock() {
            Selected newer ETFs can work with 100 days.
            All other stocks/ETFs still require 200 days.
         */
+        
         const minimumDaysByStock = {
             NIFTYCASE: 50,
         };
-
+        
         const minimumDays =
             minimumDaysByStock[stock] || 200;
-
+        
         if (history.length < minimumDays) {
-            throw new Error(
-                `${minimumDays} days ka data available nahi hai`
-            );
+            throw new Error("TEST: NIFTYCASE wala code run ho raha hai");
         }
 
 
