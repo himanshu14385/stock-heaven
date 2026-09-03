@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+    <header>
+        <div>
+            <h1>Stock Analyzer</h1>
+            <p>Analyze stocks based on your custom conditions</p>
+        </div>
+    </header>
+
+    <!-- Search -->
+    <section class="search-section">
+        <input 
+            type="text" 
+            id="stockInput" 
+            placeholder="Enter stock name or symbol e.g. RELIANCE"
+        >
+        <button onclick="analyzeStock()">Analyze</button>
+    </section>
+
+    <!-- Stock Overview -->
+    <section class="overview">
+
+        <div class="stock-name">
+            <span id="stockSymbol">RELIANCE</span>
+            <small id="stockExchange">NSE</small>
+        </div>
+
+        <div class="price">
+            ₹<span id="stockPrice">--</span>
+        </div>
+
+        <div class="change" id="stockChange">
+            --
+        </div>
+
+    </section>
+
+    <!-- Chart -->
+    <section class="card chart-card">
+
+        <div class="card-header">
+            <h2>Price Chart</h2>
+
+            <div class="time-buttons">
+                <button class="active">1M</button>
+                <button>3M</button>
+                <button>6M</button>
+                <button>1Y</button>
+            </div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-line"></div>
+            <span>Price Chart</span>
+        </div>
+
+    </section>
+
+    <!-- Score -->
+    <section class="score-section">
+
+        <div class="card score-card">
+
+            <h2>Overall Score</h2>
+
+            <div class="score-circle">
+                <span id="score">--</span>
+                <small>/100</small>
+            </div>
+
+            <div id="signal" class="signal">
+                Waiting for analysis
+            </div>
+
+        </div>
+
+        <div class="card breakdown-card">
+
+            <h2>Score Breakdown</h2>
+
+            <div class="score-row">
+                <span>Trend</span>
+                <strong id="trendScore">-- / 20</strong>
+            </div>
+
+            <div class="score-row">
+                <span>Momentum</span>
+                <strong id="momentumScore">-- / 20</strong>
+            </div>
+
+            <div class="score-row">
+                <span>RSI</span>
+                <strong id="rsiScore">-- / 10</strong>
+            </div>
+
+            <div class="score-row">
+                <span>Moving Average</span>
+                <strong id="maScore">-- / 15</strong>
+            </div>
+
+            <div class="score-row">
+                <span>Volume</span>
+                <strong id="volumeScore">-- / 10</strong>
+            </div>
+
+            <div class="score-row">
+                <span>Valuation</span>
+                <strong id="valuationScore">-- / 15</strong>
+            </div>
+
+            <div class="score-row">
+                <span>Risk</span>
+                <strong id="riskScore">-- / 10</strong>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- Indicators -->
+    <section class="card indicators">
+
+        <h2>Technical Indicators</h2>
+
+        <div class="indicator-grid">
+
+            <div class="indicator">
+                <span>RSI</span>
+                <strong id="rsi">--</strong>
+            </div>
+
+            <div class="indicator">
+                <span>20 DMA</span>
+                <strong id="dma20">--</strong>
+            </div>
+
+            <div class="indicator">
+                <span>50 DMA</span>
+                <strong id="dma50">--</strong>
+            </div>
+
+            <div class="indicator">
+                <span>200 DMA</span>
+                <strong id="dma200">--</strong>
+            </div>
+
+            <div class="indicator">
+                <span>Volume</span>
+                <strong id="volume">--</strong>
+            </div>
+
+            <div class="indicator">
+                <span>52W High</span>
+                <strong id="high52">--</strong>
+            </div>
+
+        </div>
+
+    </section>
+
+    <footer>
+        <p>Stock Analyzer • Data will be connected in the next step</p>
+    </footer>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

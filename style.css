@@ -1,0 +1,318 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  }
+
+body {
+font-family: Arial, Helvetica, sans-serif;
+background: #f5f7fb;
+color: #172033;
+}
+
+.container {
+width: 92%;
+max-width: 1200px;
+margin: auto;
+padding: 35px 0;
+}
+
+/* Header */
+
+header {
+margin-bottom: 30px;
+}
+
+header h1 {
+font-size: 32px;
+margin-bottom: 8px;
+}
+
+header p {
+color: #697386;
+font-size: 15px;
+}
+
+/* Search */
+
+.search-section {
+display: flex;
+gap: 12px;
+margin-bottom: 25px;
+}
+
+.search-section input {
+flex: 1;
+padding: 15px 18px;
+border: 1px solid #d9deea;
+border-radius: 10px;
+font-size: 16px;
+outline: none;
+background: white;
+}
+
+.search-section input:focus {
+border-color: #4969ff;
+}
+
+.search-section button {
+padding: 0 28px;
+border: none;
+border-radius: 10px;
+background: #4969ff;
+color: white;
+font-size: 16px;
+font-weight: bold;
+cursor: pointer;
+}
+
+.search-section button:hover {
+background: #3554e8;
+}
+
+/* Overview */
+
+.overview {
+display: grid;
+grid-template-columns: 1fr 1fr 1fr;
+gap: 20px;
+background: white;
+padding: 25px;
+border-radius: 14px;
+margin-bottom: 20px;
+box-shadow: 0 3px 15px rgba(0,0,0,0.04);
+}
+
+.stock-name {
+display: flex;
+flex-direction: column;
+justify-content: center;
+}
+
+.stock-name span {
+font-size: 25px;
+font-weight: bold;
+}
+
+.stock-name small {
+color: #7b8497;
+margin-top: 5px;
+}
+
+.price {
+font-size: 30px;
+font-weight: bold;
+display: flex;
+align-items: center;
+}
+
+.change {
+display: flex;
+align-items: center;
+justify-content: flex-end;
+font-size: 18px;
+font-weight: bold;
+}
+
+/* Cards */
+
+.card {
+background: white;
+border-radius: 14px;
+padding: 25px;
+box-shadow: 0 3px 15px rgba(0,0,0,0.04);
+margin-bottom: 20px;
+}
+
+.card h2 {
+font-size: 18px;
+}
+
+/* Chart */
+
+.card-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+.time-buttons {
+display: flex;
+gap: 5px;
+}
+
+.time-buttons button {
+border: none;
+background: #f0f2f7;
+padding: 7px 12px;
+border-radius: 7px;
+cursor: pointer;
+}
+
+.time-buttons button.active {
+background: #4969ff;
+color: white;
+}
+
+.chart-placeholder {
+height: 300px;
+margin-top: 20px;
+border-radius: 10px;
+background: linear-gradient(
+to bottom,
+#ffffff,
+#f7f9fd
+);
+border: 1px solid #edf0f5;
+position: relative;
+display: flex;
+align-items: center;
+justify-content: center;
+color: #9aa3b5;
+overflow: hidden;
+}
+
+.chart-line {
+position: absolute;
+width: 90%;
+height: 2px;
+background: #4969ff;
+transform: rotate(-8deg);
+opacity: 0.35;
+}
+
+/* Score */
+
+.score-section {
+display: grid;
+grid-template-columns: 0.8fr 1.2fr;
+gap: 20px;
+}
+
+.score-card {
+text-align: center;
+}
+
+.score-circle {
+width: 150px;
+height: 150px;
+border-radius: 50%;
+border: 12px solid #e8ecf5;
+margin: 25px auto 15px;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-direction: column;
+}
+
+.score-circle span {
+font-size: 42px;
+font-weight: bold;
+}
+
+.score-circle small {
+color: #7b8497;
+}
+
+.signal {
+display: inline-block;
+padding: 8px 16px;
+border-radius: 20px;
+background: #eef1f6;
+color: #657083;
+font-size: 14px;
+font-weight: bold;
+}
+
+/* Breakdown */
+
+.score-row {
+display: flex;
+justify-content: space-between;
+padding: 14px 0;
+border-bottom: 1px solid #edf0f5;
+}
+
+.score-row:last-child {
+border-bottom: none;
+}
+
+.score-row span {
+color: #697386;
+}
+
+/* Indicators */
+
+.indicator-grid {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 15px;
+margin-top: 20px;
+}
+
+.indicator {
+background: #f7f8fb;
+padding: 18px;
+border-radius: 10px;
+}
+
+.indicator span {
+display: block;
+color: #737d90;
+font-size: 13px;
+margin-bottom: 8px;
+}
+
+.indicator strong {
+font-size: 19px;
+}
+
+/* Footer */
+
+footer {
+text-align: center;
+padding: 20px;
+color: #8992a3;
+font-size: 13px;
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+
+```
+.container {
+    width: 94%;
+    padding: 20px 0;
+}
+
+header h1 {
+    font-size: 26px;
+}
+
+.search-section {
+    flex-direction: column;
+}
+
+.search-section button {
+    height: 48px;
+}
+
+.overview {
+    grid-template-columns: 1fr;
+}
+
+.change {
+    justify-content: flex-start;
+}
+
+.score-section {
+    grid-template-columns: 1fr;
+}
+
+.indicator-grid {
+    grid-template-columns: repeat(2, 1fr);
+}
+```
+
+}
