@@ -1350,7 +1350,28 @@ const stockList = [
     ["SRF", "SRF Limited"],
     ["TORNTPHARM", "Torrent Pharmaceuticals Limited"],
     ["MAXHEALTH", "Max Healthcare Institute Limited"],
-    ["CGPOWER", "CG Power and Industrial Solutions Limited"]
+    ["CGPOWER", "CG Power and Industrial Solutions Limited"],
+    ["AWL", "Adani Wilmar Limited"],
+    ["ADANIENSOL", "Adani Energy Solutions Limited"],
+    ["CDSL", "Central Depository Services (India) Limited"],
+    ["COCHINSHIP", "Cochin Shipyard Limited"],
+    ["IGL", "Indraprastha Gas Limited"],
+    ["RADICO", "Radico Khaitan Limited"],
+    ["TATAMOTORS", "Tata Motors Limited"],
+    ["TATAGOLD", "Tata Gold Exchange Traded Fund"],
+    ["TATASILV", "Tata Silver Exchange Traded Fund"],
+    ["ENERGYETF", "Mirae Asset Nifty Energy ETF"],
+    ["CPSEETF", "CPSE Exchange Traded Fund"],
+    ["ZERODHA50", "Zerodha Nifty 50 ETF"],
+    ["BANKBEES", "Nippon India ETF Nifty Bank BeES"],
+    ["GOLDBEES", "Nippon India ETF Gold BeES"],
+    ["ICICIFMCG", "ICICI Prudential Nifty FMCG ETF"],
+    ["ICICIMID150", "ICICI Prudential Nifty Midcap 150 ETF"],
+    ["ICICINXT50", "ICICI Prudential Nifty Next 50 ETF"],
+    ["KOTAKALPHA", "Kotak Nifty Alpha 50 ETF"],
+    ["ITBEES", "Nippon India ETF Nifty IT BeES"],
+    ["HDFCBANKETF", "HDFC Nifty Bank ETF"],
+    ["MIRAESMQ", "Mirae Asset Nifty Smallcap 250 Momentum Quality 100 ETF"]
 ];
 
 
