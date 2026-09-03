@@ -1326,8 +1326,31 @@ const stockList = [
     ["CANBK", "Canara Bank"],
     ["IDFCFIRSTB", "IDFC First Bank Limited"],
     ["FEDERALBNK", "The Federal Bank Limited"],
-    ["RECLTD", "REC Limited"]
-
+    ["RECLTD", "REC Limited"],
+    ["TECHM", "Tech Mahindra Limited"],
+    ["LTIM", "LTIMindtree Limited"],
+    ["JIOFIN", "Jio Financial Services Limited"],
+    ["AMBUJACEM", "Ambuja Cements Limited"],
+    ["SHREECEM", "Shree Cement Limited"],
+    ["CHOLAFIN", "Cholamandalam Investment and Finance Company Limited"],
+    ["UPL", "UPL Limited"],
+    ["ADANIGREEN", "Adani Green Energy Limited"],
+    ["ADANIENSOL", "Adani Energy Solutions Limited"],
+    ["HDFCAMC", "HDFC Asset Management Company Limited"],
+    ["ICICIGI", "ICICI Lombard General Insurance Company Limited"],
+    ["JINDALSTEL", "Jindal Steel & Power Limited"],
+    ["MARICO", "Marico Limited"],
+    ["MUTHOOTFIN", "Muthoot Finance Limited"],
+    ["NAUKRI", "Info Edge (India) Limited"],
+    ["PIIND", "PI Industries Limited"],
+    ["MCDOWELL-N", "United Spirits Limited"],
+    ["BAJAJHLDNG", "Bajaj Holdings & Investment Limited"],
+    ["BERGEPAINT", "Berger Paints India Limited"],
+    ["SBICARD", "SBI Cards and Payment Services Limited"],
+    ["SRF", "SRF Limited"],
+    ["TORNTPHARM", "Torrent Pharmaceuticals Limited"],
+    ["MAXHEALTH", "Max Healthcare Institute Limited"],
+    ["CGPOWER", "CG Power and Industrial Solutions Limited"]
 ];
 
 
