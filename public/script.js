@@ -1499,3 +1499,20 @@ document.addEventListener(
 
     }
 );
+
+function quickSelectStock(symbol) {
+
+    const input = document.getElementById("stockInput");
+    const suggestions = document.getElementById("stockSuggestions");
+
+    if (input) {
+        input.value = symbol;
+    }
+
+    if (suggestions) {
+        suggestions.style.display = "none";
+        suggestions.innerHTML = "";
+    }
+
+    analyzeStock();
+}
