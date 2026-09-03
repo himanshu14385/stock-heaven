@@ -1,6 +1,8 @@
 async function analyzeStock() {
 
-    const stock = document.getElementById("stockInput").value
+    const input = document.getElementById("stockInput");
+
+    const stock = input.value
         .trim()
         .toUpperCase();
 
@@ -11,37 +13,44 @@ async function analyzeStock() {
 
     try {
 
-        const url = `/api/stock?symbol=${encodeURIComponent(stock)}`;
+        const url =
+            `/api/stock?symbol=${encodeURIComponent(stock)}`;
 
         const response = await fetch(url);
+
         const result = await response.json();
 
         if (!response.ok || result.error) {
-            throw new Error(result.error || "Stock not found");
+            throw new Error(
+                result.error || "Stock not found"
+            );
         }
+
 
         const history = result.history || [];
 
         if (history.length < 200) {
-            throw new Error("200 days ka data available nahi hai");
+            throw new Error(
+                "200 days ka data available nahi hai"
+            );
         }
 
-        // =====================================================
-        // BASIC STOCK DATA
-        // =====================================================
 
         const closes = history
             .map(item => Number(item.close))
             .filter(value => !isNaN(value));
 
+
         const volumes = history
             .map(item => Number(item.volume || 0));
 
+
         const price = Number(result.price);
 
-        // =====================================================
-        // MOVING AVERAGE
-        // =====================================================
+
+        /* =========================
+           HELPERS
+        ========================= */
 
         function movingAverage(data, period) {
 
@@ -59,13 +68,6 @@ async function analyzeStock() {
             return sum / period;
         }
 
-        const dma20 = movingAverage(closes, 20);
-        const dma50 = movingAverage(closes, 50);
-        const dma200 = movingAverage(closes, 200);
-
-        // =====================================================
-        // RSI 14
-        // =====================================================
 
         function calculateRSI(data, period = 14) {
 
@@ -76,9 +78,11 @@ async function analyzeStock() {
             let gains = 0;
             let losses = 0;
 
+
             for (let i = 1; i <= period; i++) {
 
-                const change = data[i] - data[i - 1];
+                const change =
+                    data[i] - data[i - 1];
 
                 if (change > 0) {
                     gains += change;
@@ -87,120 +91,432 @@ async function analyzeStock() {
                 }
             }
 
+
             let averageGain = gains / period;
             let averageLoss = losses / period;
 
-            for (let i = period + 1; i < data.length; i++) {
 
-                const change = data[i] - data[i - 1];
+            for (
+                let i = period + 1;
+                i < data.length;
+                i++
+            ) {
 
-                const gain = change > 0 ? change : 0;
-                const loss = change < 0 ? Math.abs(change) : 0;
+                const change =
+                    data[i] - data[i - 1];
+
+                const gain =
+                    change > 0 ? change : 0;
+
+                const loss =
+                    change < 0
+                        ? Math.abs(change)
+                        : 0;
+
 
                 averageGain =
-                    ((averageGain * (period - 1)) + gain) / period;
+                    (
+                        averageGain * (period - 1)
+                        + gain
+                    ) / period;
+
 
                 averageLoss =
-                    ((averageLoss * (period - 1)) + loss) / period;
+                    (
+                        averageLoss * (period - 1)
+                        + loss
+                    ) / period;
             }
+
 
             if (averageLoss === 0) {
                 return 100;
             }
 
-            const relativeStrength =
+
+            const rs =
                 averageGain / averageLoss;
 
-            return 100 - (100 / (1 + relativeStrength));
+
+            return 100 - (
+                100 / (1 + rs)
+            );
         }
 
-        const rsi = calculateRSI(closes, 14);
 
-        // =====================================================
-        // AVERAGE VOLUME
-        // =====================================================
+        function setText(id, value) {
+
+            const element =
+                document.getElementById(id);
+
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+
+        function money(value) {
+
+            if (
+                value === null ||
+                value === undefined ||
+                isNaN(value)
+            ) {
+                return "--";
+            }
+
+            return `₹${Number(value).toLocaleString(
+                "en-IN",
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            )}`;
+        }
+
+
+        function number(value) {
+
+            if (
+                value === null ||
+                value === undefined ||
+                isNaN(value)
+            ) {
+                return "--";
+            }
+
+            return Number(value)
+                .toLocaleString("en-IN");
+        }
+
+
+        /* =========================
+           CALCULATIONS
+        ========================= */
+
+        const dma20 =
+            movingAverage(closes, 20);
+
+        const dma50 =
+            movingAverage(closes, 50);
+
+        const dma200 =
+            movingAverage(closes, 200);
+
+
+        const rsi =
+            calculateRSI(closes, 14);
+
 
         const averageVolume =
             movingAverage(volumes, 20);
 
+
         const currentVolume =
             volumes[volumes.length - 1];
 
-        // =====================================================
-        // UPDATE INDICATORS ON SCREEN
-        // =====================================================
+
+        const price20DaysAgo =
+            closes[closes.length - 21];
+
+
+        const price50DaysAgo =
+            closes[closes.length - 51];
+
+
+        const return20 =
+            (
+                (price - price20DaysAgo)
+                / price20DaysAgo
+            ) * 100;
+
+
+        const return50 =
+            (
+                (price - price50DaysAgo)
+                / price50DaysAgo
+            ) * 100;
+
+
+        const volumeRatio =
+            averageVolume > 0
+                ? (
+                    currentVolume /
+                    averageVolume
+                ) * 100
+                : 0;
+
+
+        const nearHigh =
+            result.year_high
+                ? (
+                    (result.year_high - price)
+                    / result.year_high
+                ) * 100
+                : null;
+
+
+        const fromLow =
+            result.year_low
+                ? (
+                    (price - result.year_low)
+                    / result.year_low
+                ) * 100
+                : null;
+
+
+        /* =========================
+           BASIC OVERVIEW
+        ========================= */
+
+        setText(
+            "stockSymbol",
+            result.symbol || stock
+        );
+
+
+        setText(
+            "stockExchange",
+            result.exchange || "NSE"
+        );
+
+
+        setText(
+            "companyName",
+            result.company_name ||
+            result.symbol ||
+            stock
+        );
+
+
+        setText(
+            "stockPrice",
+            money(price)
+        );
+
+
+        const change =
+            Number(result.change || 0);
+
+        const percentChange =
+            Number(result.percent_change || 0);
+
+
+        const changeElement =
+            document.getElementById(
+                "stockChange"
+            );
+
+
+        if (changeElement) {
+
+            changeElement.textContent =
+                `${change >= 0 ? "+" : ""}` +
+                `${change.toFixed(2)} ` +
+                `(${percentChange >= 0 ? "+" : ""}` +
+                `${percentChange.toFixed(2)}%)`;
+
+            changeElement.style.color =
+                change >= 0
+                    ? "#15934a"
+                    : "#e04d4d";
+        }
+
+
+        const last =
+            history[history.length - 1];
+
+
+        setText(
+            "openPrice",
+            money(last.open)
+        );
+
+
+        setText(
+            "dayHigh",
+            money(last.high)
+        );
+
+
+        setText(
+            "dayLow",
+            money(last.low)
+        );
+
+
+        setText(
+            "previousClose",
+            money(result.previous_close)
+        );
+
+
+        setText(
+            "volumeTop",
+            number(currentVolume)
+        );
+
+
+        setText(
+            "high52Top",
+            money(result.year_high)
+        );
+
+
+        setText(
+            "low52Top",
+            money(result.year_low)
+        );
+
+
+        setText(
+            "currency",
+            result.currency || "INR"
+        );
+
+
+        /* =========================
+           HIGHLIGHTS
+        ========================= */
+
+        setText(
+            "nearHigh",
+            nearHigh !== null
+                ? `${nearHigh.toFixed(2)}% below`
+                : "--"
+        );
+
+
+        setText(
+            "fromLow",
+            fromLow !== null
+                ? `${fromLow.toFixed(2)}% above`
+                : "--"
+        );
+
+
+        setText(
+            "avgVolume",
+            number(averageVolume)
+        );
+
+
+        setText(
+            "currentVolume",
+            number(currentVolume)
+        );
+
+
+        setText(
+            "volumeVsAverage",
+            averageVolume > 0
+                ? `${volumeRatio.toFixed(2)}%`
+                : "--"
+        );
+
+
+        /* =========================
+           TECHNICAL INDICATORS
+        ========================= */
 
         setText(
             "rsi",
             rsi !== null
                 ? rsi.toFixed(2)
-                : "-"
+                : "--"
         );
+
 
         setText(
             "dma20",
-            dma20 !== null
-                ? `₹${dma20.toFixed(2)}`
-                : "-"
+            money(dma20)
         );
+
 
         setText(
             "dma50",
-            dma50 !== null
-                ? `₹${dma50.toFixed(2)}`
-                : "-"
+            money(dma50)
         );
+
 
         setText(
             "dma200",
-            dma200 !== null
-                ? `₹${dma200.toFixed(2)}`
-                : "-"
+            money(dma200)
         );
+
 
         setText(
             "volume",
-            currentVolume
-                ? Number(currentVolume).toLocaleString("en-IN")
-                : "-"
+            number(currentVolume)
         );
+
 
         setText(
             "high52",
-            result.year_high
-                ? `₹${Number(result.year_high).toFixed(2)}`
-                : "-"
+            money(result.year_high)
         );
 
-        // =====================================================
-        // STOCK OVERVIEW
-        // =====================================================
 
-        setText("stockSymbol", result.symbol || stock);
-        setText("stockExchange", result.exchange || "NSE");
+        /* STATUS */
 
         setText(
-            "stockPrice",
-            Number(price).toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            })
+            "rsiStatus",
+            rsi >= 70
+                ? "Overbought"
+                : rsi >= 50
+                    ? "Healthy"
+                    : rsi >= 30
+                        ? "Weak"
+                        : "Oversold"
         );
 
-        const change = Number(result.change || 0);
-        const percentChange = Number(result.percent_change || 0);
 
         setText(
-            "stockChange",
-            `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${percentChange >= 0 ? "+" : ""}${percentChange.toFixed(2)}%)`
+            "dma20Status",
+            price > dma20
+                ? "Price above"
+                : "Price below"
         );
 
-        // =====================================================
-        // TREND SCORE
-        // Maximum 20
-        // =====================================================
+
+        setText(
+            "dma50Status",
+            price > dma50
+                ? "Price above"
+                : "Price below"
+        );
+
+
+        setText(
+            "dma200Status",
+            price > dma200
+                ? "Price above"
+                : "Price below"
+        );
+
+
+        setText(
+            "volumeStatus",
+            currentVolume > averageVolume
+                ? "Above Avg"
+                : "Below Avg"
+        );
+
+
+        setText(
+            "high52Status",
+            nearHigh !== null
+                ? `${nearHigh.toFixed(1)}% below`
+                : "--"
+        );
+
+
+        /* =========================
+           SCORE
+        ========================= */
 
         let trendScore = 0;
+
 
         if (price > dma20) {
             trendScore += 5;
@@ -222,28 +538,9 @@ async function analyzeStock() {
             trendScore += 2.5;
         }
 
-        // =====================================================
-        // MOMENTUM SCORE
-        // Maximum 20
-        // =====================================================
 
         let momentumScore = 0;
 
-        const price20DaysAgo =
-            closes.length > 20
-                ? closes[closes.length - 21]
-                : price;
-
-        const price50DaysAgo =
-            closes.length > 50
-                ? closes[closes.length - 51]
-                : price;
-
-        const return20 =
-            ((price - price20DaysAgo) / price20DaysAgo) * 100;
-
-        const return50 =
-            ((price - price50DaysAgo) / price50DaysAgo) * 100;
 
         if (return20 > 0) {
             momentumScore += 10;
@@ -253,173 +550,398 @@ async function analyzeStock() {
             momentumScore += 10;
         }
 
-        // =====================================================
-        // RSI SCORE
-        // Maximum 10
-        // =====================================================
 
         let rsiScore = 0;
 
+
         if (rsi >= 50 && rsi <= 70) {
+
             rsiScore = 10;
+
         } else if (rsi >= 40 && rsi < 50) {
+
             rsiScore = 7;
+
         } else if (rsi > 70 && rsi <= 80) {
+
             rsiScore = 6;
+
         } else if (rsi >= 30 && rsi < 40) {
+
             rsiScore = 4;
+
         } else if (rsi < 30) {
+
             rsiScore = 5;
+
         } else {
+
             rsiScore = 3;
         }
 
-        // =====================================================
-        // MA SCORE
-        // Maximum 10
-        // =====================================================
+
+        /* MA SCORE = 15 */
 
         let maScore = 0;
 
+
         if (price > dma20) {
-            maScore += 3;
+            maScore += 5;
         }
 
         if (price > dma50) {
-            maScore += 3;
+            maScore += 5;
         }
 
         if (price > dma200) {
-            maScore += 4;
+            maScore += 5;
         }
 
-        // =====================================================
-        // VOLUME SCORE
-        // Maximum 10
-        // =====================================================
 
-        let volumeScore = 0;
+        /* VOLUME = 10 */
 
-        if (currentVolume > averageVolume) {
+        let volumeScore = 5;
+
+
+        if (
+            currentVolume >
+            averageVolume
+        ) {
             volumeScore = 10;
-        } else {
-            volumeScore = 5;
         }
 
-        // =====================================================
-        // RISK SCORE
-        // Maximum 10
-        // Higher = lower risk
-        // =====================================================
+
+        /* RISK = 10 */
 
         let riskScore = 5;
+
 
         if (price > dma200) {
             riskScore += 3;
         }
 
-        if (rsi >= 40 && rsi <= 70) {
+
+        if (
+            rsi >= 40 &&
+            rsi <= 70
+        ) {
             riskScore += 2;
         }
+
 
         if (riskScore > 10) {
             riskScore = 10;
         }
 
-        // =====================================================
-        // VALUATION
-        // TEMPORARY
-        // =====================================================
 
-        const valuationScore = 0;
+        /*
+            Valuation currently unavailable.
 
-        // =====================================================
-        // OVERALL SCORE
-        // =====================================================
+            Total available score = 85
 
-        const overallScore =
+            Trend       20
+            Momentum    20
+            RSI         10
+            MA          15
+            Volume      10
+            Risk        10
+        */
+
+        const totalScore =
             trendScore +
             momentumScore +
             rsiScore +
             maScore +
             volumeScore +
-            valuationScore +
             riskScore;
 
-        // =====================================================
-        // UPDATE SCORE BREAKDOWN
-        // =====================================================
+
+        const normalizedScore =
+            (totalScore / 85) * 100;
+
+
+        /* =========================
+           DISPLAY SCORE
+        ========================= */
 
         setText(
             "trendScore",
             `${trendScore.toFixed(1)} / 20`
         );
 
+
         setText(
             "momentumScore",
             `${momentumScore.toFixed(1)} / 20`
         );
+
 
         setText(
             "rsiScore",
             `${rsiScore.toFixed(1)} / 10`
         );
 
+
         setText(
             "maScore",
-            `${maScore.toFixed(1)} / 10`
+            `${maScore.toFixed(1)} / 15`
         );
+
 
         setText(
             "volumeScore",
             `${volumeScore.toFixed(1)} / 10`
         );
 
-        setText(
-            "valuationScore",
-            `${valuationScore.toFixed(1)} / 20`
-        );
 
         setText(
             "riskScore",
             `${riskScore.toFixed(1)} / 10`
         );
 
+
         setText(
-            "score",
-            Math.round(overallScore)
+            "totalScore",
+            `${totalScore.toFixed(1)} / 85`
         );
 
-        // =====================================================
-        // SIGNAL
-        // =====================================================
 
-        let signal = "NEUTRAL";
+        setText(
+            "score",
+            Math.round(normalizedScore)
+        );
 
-        if (overallScore >= 75) {
+
+        /* SCORE BARS */
+
+        setBar(
+            "trendBar",
+            trendScore / 20 * 100
+        );
+
+        setBar(
+            "momentumBar",
+            momentumScore / 20 * 100
+        );
+
+        setBar(
+            "rsiBar",
+            rsiScore / 10 * 100
+        );
+
+        setBar(
+            "maBar",
+            maScore / 15 * 100
+        );
+
+        setBar(
+            "volumeBar",
+            volumeScore / 10 * 100
+        );
+
+        setBar(
+            "riskBar",
+            riskScore / 10 * 100
+        );
+
+
+        /* SCORE RING */
+
+        updateScoreRing(
+            normalizedScore
+        );
+
+
+        /* =========================
+           SIGNAL
+        ========================= */
+
+        let signal =
+            "NEUTRAL";
+
+        let signalClass =
+            "neutral";
+
+
+        if (normalizedScore >= 75) {
+
             signal = "STRONG";
-        } else if (overallScore >= 60) {
+            signalClass = "strong";
+
+        } else if (normalizedScore >= 60) {
+
             signal = "POSITIVE";
-        } else if (overallScore < 40) {
+            signalClass = "positive";
+
+        } else if (normalizedScore < 40) {
+
             signal = "WEAK";
+            signalClass = "weak";
         }
 
-        setText("signal", signal);
 
-        console.log("===== STOCK ANALYSIS =====");
-        console.log("Price:", price);
-        console.log("DMA20:", dma20);
-        console.log("DMA50:", dma50);
-        console.log("DMA200:", dma200);
-        console.log("RSI:", rsi);
-        console.log("20D Return:", return20);
-        console.log("50D Return:", return50);
-        console.log("Average Volume:", averageVolume);
-        console.log("Overall Score:", overallScore);
+        const signalElement =
+            document.getElementById(
+                "signal"
+            );
+
+
+        signalElement.textContent =
+            signal;
+
+        signalElement.className =
+            `signal ${signalClass}`;
+
+
+        /* DESCRIPTION */
+
+        let description =
+            "Technical conditions are mixed.";
+
+
+        if (normalizedScore >= 75) {
+
+            description =
+                "Strong technical setup with positive trend and momentum.";
+
+        } else if (normalizedScore >= 60) {
+
+            description =
+                "Positive technical structure with reasonably healthy momentum.";
+
+        } else if (normalizedScore < 40) {
+
+            description =
+                "Technical structure is weak and requires caution.";
+        }
+
+
+        setText(
+            "scoreDescription",
+            description
+        );
+
+
+        /* =========================
+           INSIGHTS
+        ========================= */
+
+        generateInsights(
+            price,
+            dma20,
+            dma50,
+            dma200,
+            rsi,
+            currentVolume,
+            averageVolume,
+            nearHigh
+        );
+
+
+        /* =========================
+           OUR TAKE
+        ========================= */
+
+        let take =
+            "Technical indicators are currently mixed.";
+
+        let badge =
+            "WATCH";
+
+
+        if (
+            price > dma20 &&
+            price > dma50 &&
+            price > dma200
+        ) {
+
+            take =
+                "Price is above the 20, 50 and 200 DMA, indicating a strong bullish technical trend.";
+
+            badge =
+                "KEEP ON WATCH";
+
+        } else if (
+            price < dma200
+        ) {
+
+            take =
+                "Price is below the 200 DMA, suggesting weaker long-term technical strength.";
+
+            badge =
+                "CAUTION";
+
+        } else if (
+            rsi < 40
+        ) {
+
+            take =
+                "RSI is relatively weak. Momentum should be monitored before taking a position.";
+
+            badge =
+                "WATCH";
+
+        }
+
+
+        setText(
+            "ourTake",
+            take
+        );
+
+
+        setText(
+            "takeBadge",
+            badge
+        );
+
+
+        console.log(
+            "===== STOCK ANALYSIS ====="
+        );
+
+        console.log(
+            "Stock:",
+            stock
+        );
+
+        console.log(
+            "Price:",
+            price
+        );
+
+        console.log(
+            "RSI:",
+            rsi
+        );
+
+        console.log(
+            "DMA20:",
+            dma20
+        );
+
+        console.log(
+            "DMA50:",
+            dma50
+        );
+
+        console.log(
+            "DMA200:",
+            dma200
+        );
+
+        console.log(
+            "Score:",
+            normalizedScore
+        );
+
 
     } catch (error) {
 
-        console.error("API ERROR:", error);
+        console.error(
+            "API ERROR:",
+            error
+        );
 
         alert(
             "Stock analysis load nahi ho paaya.\n\n" +
@@ -429,15 +951,275 @@ async function analyzeStock() {
 }
 
 
-// =====================================================
-// HELPER
-// =====================================================
+/* =========================
+   SCORE BAR
+========================= */
 
-function setText(id, value) {
+function setBar(id, percentage) {
 
-    const element = document.getElementById(id);
+    const element =
+        document.getElementById(id);
 
-    if (element) {
-        element.textContent = value;
+    if (!element) {
+        return;
+    }
+
+    element.style.width =
+        `${Math.max(
+            0,
+            Math.min(100, percentage)
+        )}%`;
+}
+
+
+/* =========================
+   SCORE RING
+========================= */
+
+function updateScoreRing(score) {
+
+    const circle =
+        document.getElementById(
+            "scoreProgress"
+        );
+
+    if (!circle) {
+        return;
+    }
+
+    const circumference =
+        2 * Math.PI * 78;
+
+    const offset =
+        circumference -
+        (
+            score / 100
+        ) * circumference;
+
+
+    circle.style.strokeDasharray =
+        circumference;
+
+    circle.style.strokeDashoffset =
+        offset;
+
+
+    if (score >= 75) {
+
+        circle.style.stroke =
+            "#21a45b";
+
+    } else if (score >= 60) {
+
+        circle.style.stroke =
+            "#3475e8";
+
+    } else if (score < 40) {
+
+        circle.style.stroke =
+            "#e85252";
+
+    } else {
+
+        circle.style.stroke =
+            "#ed9b18";
+    }
+}
+
+
+/* =========================
+   INSIGHTS
+========================= */
+
+function generateInsights(
+    price,
+    dma20,
+    dma50,
+    dma200,
+    rsi,
+    volume,
+    averageVolume,
+    nearHigh
+) {
+
+    const container =
+        document.getElementById(
+            "insights"
+        );
+
+
+    let html = "";
+
+
+    if (
+        price > dma20 &&
+        price > dma50 &&
+        price > dma200
+    ) {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon green">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                </div>
+
+                <div>
+                    <strong>Price is above 20, 50 & 200 DMA</strong>
+                    <span>Strong bullish trend</span>
+                </div>
+
+            </div>
+        `;
+
+    } else {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon orange">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+
+                <div>
+                    <strong>Price is below some moving averages</strong>
+                    <span>Trend needs monitoring</span>
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    if (
+        rsi >= 50 &&
+        rsi <= 70
+    ) {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon green">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+
+                <div>
+                    <strong>RSI is in healthy zone</strong>
+                    <span>Momentum looks balanced</span>
+                </div>
+
+            </div>
+        `;
+
+    } else if (rsi > 70) {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon orange">
+                    <i class="fa-solid fa-fire"></i>
+                </div>
+
+                <div>
+                    <strong>RSI indicates overbought zone</strong>
+                    <span>Short-term caution required</span>
+                </div>
+
+            </div>
+        `;
+
+    } else {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon red">
+                    <i class="fa-solid fa-arrow-down"></i>
+                </div>
+
+                <div>
+                    <strong>RSI is relatively weak</strong>
+                    <span>Momentum needs improvement</span>
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    if (
+        volume >
+        averageVolume
+    ) {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon blue">
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+
+                <div>
+                    <strong>Volume is above average</strong>
+                    <span>Higher market participation</span>
+                </div>
+
+            </div>
+        `;
+
+    } else {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon blue">
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+
+                <div>
+                    <strong>Volume is below average</strong>
+                    <span>Participation is relatively low</span>
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    if (
+        nearHigh !== null &&
+        nearHigh < 10
+    ) {
+
+        html += `
+            <div class="insight">
+
+                <div class="insight-icon orange">
+                    <i class="fa-solid fa-bullseye"></i>
+                </div>
+
+                <div>
+                    <strong>Price is near 52W High</strong>
+                    <span>Possible resistance zone</span>
+                </div>
+
+            </div>
+        `;
+    }
+
+
+    container.innerHTML =
+        html;
+}
+
+
+/* =========================
+   ENTER KEY
+========================= */
+
+function handleSearch(event) {
+
+    if (event.key === "Enter") {
+        analyzeStock();
     }
 }
