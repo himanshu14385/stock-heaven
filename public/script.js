@@ -36,15 +36,17 @@ async function analyzeStock() {
         */
         
         const minimumDaysByStock = {
-            NIFTYCASE: 20,
+            "NIFTYCASE.NS": 20,
         };
         
         const minimumDays =
             minimumDaysByStock[stock] || 200;
         
-        throw new Error(
-            `${stock}: Yahoo se ${history.length} days ka data mila`
-        );
+        if (history.length < minimumDays) {
+            throw new Error(
+                `${minimumDays} days ka data available nahi hai`
+            );
+        }
 
 
         const closes = history
