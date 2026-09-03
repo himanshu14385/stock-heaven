@@ -1223,3 +1223,279 @@ function handleSearch(event) {
         analyzeStock();
     }
 }
+
+
+/* =========================
+   STOCK SEARCH DATABASE
+========================= */
+
+const stockList = [
+
+    ["RELIANCE", "Reliance Industries Limited"],
+    ["TCS", "Tata Consultancy Services Limited"],
+    ["HDFCBANK", "HDFC Bank Limited"],
+    ["INFY", "Infosys Limited"],
+    ["ICICIBANK", "ICICI Bank Limited"],
+    ["BHARTIARTL", "Bharti Airtel Limited"],
+    ["SBIN", "State Bank of India"],
+    ["ITC", "ITC Limited"],
+    ["HINDUNILVR", "Hindustan Unilever Limited"],
+    ["LT", "Larsen & Toubro Limited"],
+    ["MARUTI", "Maruti Suzuki India Limited"],
+    ["BAJFINANCE", "Bajaj Finance Limited"],
+    ["TITAN", "Titan Company Limited"],
+    ["ASIANPAINT", "Asian Paints Limited"],
+    ["AXISBANK", "Axis Bank Limited"],
+    ["KOTAKBANK", "Kotak Mahindra Bank Limited"],
+    ["HCLTECH", "HCL Technologies Limited"],
+    ["WIPRO", "Wipro Limited"],
+    ["SUNPHARMA", "Sun Pharmaceutical Industries Limited"],
+    ["NTPC", "NTPC Limited"],
+    ["POWERGRID", "Power Grid Corporation of India Limited"],
+    ["ONGC", "Oil & Natural Gas Corporation Limited"],
+    ["COALINDIA", "Coal India Limited"],
+    ["TATASTEEL", "Tata Steel Limited"],
+    ["JSWSTEEL", "JSW Steel Limited"],
+    ["ADANIENT", "Adani Enterprises Limited"],
+    ["ADANIPORTS", "Adani Ports and Special Economic Zone Limited"],
+    ["ADANIPOWER", "Adani Power Limited"],
+    ["BEL", "Bharat Electronics Limited"],
+    ["HAL", "Hindustan Aeronautics Limited"],
+    ["TRENT", "Trent Limited"],
+    ["M&M", "Mahindra & Mahindra Limited"],
+    ["EICHERMOT", "Eicher Motors Limited"],
+    ["HEROMOTOCO", "Hero MotoCorp Limited"],
+    ["BAJAJ-AUTO", "Bajaj Auto Limited"],
+    ["BAJAJFINSV", "Bajaj Finserv Limited"],
+    ["INDUSINDBK", "IndusInd Bank Limited"],
+    ["GRASIM", "Grasim Industries Limited"],
+    ["ULTRACEMCO", "UltraTech Cement Limited"],
+    ["CIPLA", "Cipla Limited"],
+    ["DRREDDY", "Dr. Reddy's Laboratories Limited"],
+    ["DIVISLAB", "Divi's Laboratories Limited"],
+    ["APOLLOHOSP", "Apollo Hospitals Enterprise Limited"],
+    ["TATAMOTORS", "Tata Motors Limited"],
+    ["TATACONSUM", "Tata Consumer Products Limited"],
+    ["TATAPOWER", "Tata Power Company Limited"],
+    ["IOC", "Indian Oil Corporation Limited"],
+    ["BPCL", "Bharat Petroleum Corporation Limited"],
+    ["GAIL", "GAIL (India) Limited"],
+    ["VEDL", "Vedanta Limited"],
+    ["HINDALCO", "Hindalco Industries Limited"],
+    ["SHRIRAMFIN", "Shriram Finance Limited"],
+    ["SBILIFE", "SBI Life Insurance Company Limited"],
+    ["HDFCLIFE", "HDFC Life Insurance Company Limited"],
+    ["ICICIPRULI", "ICICI Prudential Life Insurance Company Limited"],
+    ["DMART", "Avenue Supermarts Limited"],
+    ["PIDILITIND", "Pidilite Industries Limited"],
+    ["DABUR", "Dabur India Limited"],
+    ["BRITANNIA", "Britannia Industries Limited"],
+    ["NESTLEIND", "Nestle India Limited"],
+    ["GODREJCP", "Godrej Consumer Products Limited"],
+    ["COLPAL", "Colgate-Palmolive (India) Limited"],
+    ["HAVELLS", "Havells India Limited"],
+    ["VOLTAS", "Voltas Limited"],
+    ["DIXON", "Dixon Technologies (India) Limited"],
+    ["POLYCAB", "Polycab India Limited"],
+    ["IRCTC", "Indian Railway Catering & Tourism Corporation Limited"],
+    ["IRFC", "Indian Railway Finance Corporation Limited"],
+    ["RVNL", "Rail Vikas Nigam Limited"],
+    ["RECLTD", "REC Limited"],
+    ["PFC", "Power Finance Corporation Limited"],
+    ["NHPC", "NHPC Limited"],
+    ["IEX", "Indian Energy Exchange Limited"],
+    ["ZOMATO", "Eternal Limited"],
+    ["PAYTM", "One 97 Communications Limited"],
+    ["NYKAA", "FSN E-Commerce Ventures Limited"],
+    ["DELHIVERY", "Delhivery Limited"],
+    ["INDIGO", "InterGlobe Aviation Limited"],
+    ["DLF", "DLF Limited"],
+    ["LODHA", "Macrotech Developers Limited"],
+    ["SIEMENS", "Siemens Limited"],
+    ["ABB", "ABB India Limited"],
+    ["CUMMINSIND", "Cummins India Limited"],
+    ["BOSCHLTD", "Bosch Limited"],
+    ["TVSMOTOR", "TVS Motor Company Limited"],
+    ["MOTHERSON", "Samvardhana Motherson International Limited"],
+    ["ASHOKLEY", "Ashok Leyland Limited"],
+    ["BHEL", "Bharat Heavy Electricals Limited"],
+    ["INDUSTOWER", "Indus Towers Limited"],
+    ["YESBANK", "Yes Bank Limited"],
+    ["BANKBARODA", "Bank of Baroda"],
+    ["PNB", "Punjab National Bank"],
+    ["CANBK", "Canara Bank"],
+    ["IDFCFIRSTB", "IDFC First Bank Limited"],
+    ["FEDERALBNK", "The Federal Bank Limited"],
+    ["RECLTD", "REC Limited"]
+
+];
+
+
+/* =========================
+   SHOW SUGGESTIONS
+========================= */
+
+function showStockSuggestions() {
+
+    const input =
+        document.getElementById(
+            "stockInput"
+        );
+
+    const container =
+        document.getElementById(
+            "stockSuggestions"
+        );
+
+
+    const query =
+        input.value
+            .trim()
+            .toUpperCase();
+
+
+    if (!query) {
+
+        container.style.display =
+            "none";
+
+        container.innerHTML = "";
+
+        return;
+    }
+
+
+    const matches =
+        stockList
+            .filter(stock => {
+
+                const symbol =
+                    stock[0].toUpperCase();
+
+                const name =
+                    stock[1].toUpperCase();
+
+
+                return (
+                    symbol.includes(query) ||
+                    name.includes(query)
+                );
+
+            })
+            .slice(0, 7);
+
+
+    if (!matches.length) {
+
+        container.style.display =
+            "none";
+
+        container.innerHTML = "";
+
+        return;
+    }
+
+
+    container.innerHTML =
+        matches.map(stock => {
+
+            const symbol =
+                stock[0];
+
+            const name =
+                stock[1];
+
+
+            return `
+                <div
+                    class="stock-suggestion"
+                    onclick="selectStock('${symbol}')"
+                >
+
+                    <div class="suggestion-icon">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+
+                    <div class="suggestion-info">
+
+                        <span class="suggestion-name">
+                            ${name}
+                        </span>
+
+                        <span class="suggestion-symbol">
+                            NSE ·
+                            <strong>${symbol}</strong>
+                        </span>
+
+                    </div>
+
+                </div>
+            `;
+
+        }).join("");
+
+
+    container.style.display =
+        "block";
+}
+
+
+/* =========================
+   SELECT SUGGESTION
+========================= */
+
+function selectStock(symbol) {
+
+    const input =
+        document.getElementById(
+            "stockInput"
+        );
+
+    const container =
+        document.getElementById(
+            "stockSuggestions"
+        );
+
+
+    input.value = symbol;
+
+    container.style.display =
+        "none";
+
+    container.innerHTML = "";
+
+
+    analyzeStock();
+}
+
+
+/* =========================
+   CLOSE SUGGESTIONS
+========================= */
+
+document.addEventListener(
+    "click",
+    function(event) {
+
+        const wrapper =
+            document.querySelector(
+                ".search-wrapper"
+            );
+
+
+        if (
+            wrapper &&
+            !wrapper.contains(event.target)
+        ) {
+
+            const container =
+                document.getElementById(
+                    "stockSuggestions"
+                );
+
+            container.style.display =
+                "none";
+        }
+
+    }
+);
