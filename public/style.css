@@ -849,162 +849,243 @@ footer {
 
 }
 
+/* navigation ---- */
+
 /* =========================
-   TOP HEADER
+   STOCK HEAVEN HEADER
 ========================= */
 
 .top-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 18px;
+
+    margin-bottom: 14px;
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 11px;
 }
 
 .brand-icon {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
 
-    border-radius: 12px;
+    border-radius: 11px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    background: #416ee8;
-    color: white;
+    background: linear-gradient(
+        135deg,
+        #416ee8,
+        #5b82f2
+    );
 
-    font-size: 18px;
+    color: #ffffff;
 
-    box-shadow: 0 6px 15px rgba(65, 110, 232, 0.20);
+    font-size: 17px;
+
+    box-shadow:
+        0 6px 16px rgba(65, 110, 232, 0.18);
 }
 
 .brand h1 {
     margin: 0;
 
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 800;
 
-    color: #20283a;
+    letter-spacing: -0.4px;
+
+    color: #1f2738;
 }
 
 .brand p {
-    margin: 3px 0 0;
+    margin: 2px 0 0;
 
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 600;
 
-    color: #8a93a5;
+    color: #929aaa;
+
+    letter-spacing: 0.2px;
 }
 
 
 /* =========================
-   MAIN NAVIGATION
+   PREMIUM NAVIGATION
 ========================= */
 
 .main-nav {
     width: 100%;
 
-    background: white;
+    background: #ffffff;
 
-    border: 1px solid #e8ebf1;
+    border: 1px solid #e7ebf2;
 
-    border-radius: 14px;
+    border-radius: 12px;
 
     margin-bottom: 22px;
 
     box-shadow:
-        0 5px 18px rgba(30, 45, 80, 0.06);
+        0 4px 18px rgba(28, 42, 70, 0.05);
 
-    overflow: hidden;
+    position: relative;
+
+    z-index: 100;
 }
 
 .nav-inner {
     display: flex;
     align-items: center;
 
-    gap: 4px;
+    padding: 5px 6px;
 
-    padding: 6px;
+    gap: 2px;
 }
 
 .nav-item {
+    position: relative;
+
     display: flex;
     align-items: center;
     justify-content: center;
 
-    gap: 8px;
+    gap: 7px;
 
-    padding: 11px 16px;
+    height: 40px;
 
-    border-radius: 10px;
+    padding: 0 15px;
+
+    border-radius: 8px;
 
     text-decoration: none;
 
-    color: #737c8f;
+    color: #7b8496;
 
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
 
     white-space: nowrap;
 
     transition:
-        background 0.2s ease,
         color 0.2s ease,
-        transform 0.2s ease;
+        background 0.2s ease;
 }
 
 .nav-item i {
-    font-size: 13px;
+    font-size: 12px;
+
+    opacity: 0.8;
+
+    transition:
+        transform 0.2s ease,
+        opacity 0.2s ease;
 }
 
 .nav-item:hover {
-    background: #f4f7ff;
     color: #416ee8;
+
+    background: #f7f9fd;
 }
 
-.nav-item.active {
-    background: #416ee8;
-    color: white;
+.nav-item:hover i {
+    opacity: 1;
 
-    box-shadow:
-        0 5px 12px rgba(65, 110, 232, 0.20);
-}
-
-.nav-item.active:hover {
-    background: #416ee8;
-    color: white;
+    transform: translateY(-1px);
 }
 
 
 /* =========================
-   MOBILE NAV
+   ACTIVE NAV ITEM
+========================= */
+
+.nav-item.active {
+    color: #416ee8;
+
+    background: #eef3ff;
+}
+
+.nav-item.active i {
+    opacity: 1;
+}
+
+/* Small active indicator */
+
+.nav-item.active::after {
+    content: "";
+
+    position: absolute;
+
+    left: 50%;
+    bottom: 3px;
+
+    width: 18px;
+    height: 2px;
+
+    transform: translateX(-50%);
+
+    border-radius: 10px;
+
+    background: #416ee8;
+}
+
+
+/* =========================
+   NAV SEPARATOR
+========================= */
+
+.nav-item:not(:last-child)::before {
+    content: "";
+
+    position: absolute;
+
+    right: -1px;
+
+    width: 1px;
+    height: 16px;
+
+    background: #edf0f5;
+
+    opacity: 0.7;
+}
+
+
+/* =========================
+   MOBILE NAVIGATION
 ========================= */
 
 @media (max-width: 700px) {
 
     .top-header {
-        margin-bottom: 14px;
+        margin-bottom: 12px;
     }
 
     .brand-icon {
-        width: 40px;
-        height: 40px;
+        width: 39px;
+        height: 39px;
 
-        border-radius: 11px;
+        border-radius: 10px;
     }
 
     .brand h1 {
-        font-size: 19px;
+        font-size: 18px;
+    }
+
+    .brand p {
+        font-size: 9px;
     }
 
     .main-nav {
         overflow-x: auto;
+
         scrollbar-width: none;
+
+        border-radius: 11px;
     }
 
     .main-nav::-webkit-scrollbar {
@@ -1013,14 +1094,39 @@ footer {
 
     .nav-inner {
         width: max-content;
+
         min-width: 100%;
+
+        padding: 5px;
     }
 
     .nav-item {
-        padding: 10px 13px;
+        height: 38px;
+
+        padding: 0 12px;
+
+        gap: 6px;
+
+        font-size: 10px;
+    }
+
+    .nav-item i {
+        font-size: 11px;
+    }
+}
+
+
+/* =========================
+   SMALL MOBILE
+========================= */
+
+@media (max-width: 430px) {
+
+    .nav-item {
+        padding: 0 10px;
     }
 
     .nav-item span {
-        font-size: 11px;
+        font-size: 9.5px;
     }
 }
