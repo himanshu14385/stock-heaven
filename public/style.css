@@ -848,3 +848,179 @@ footer {
     }
 
 }
+
+/* =========================
+   TOP HEADER
+========================= */
+
+.top-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-icon {
+    width: 44px;
+    height: 44px;
+
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #416ee8;
+    color: white;
+
+    font-size: 18px;
+
+    box-shadow: 0 6px 15px rgba(65, 110, 232, 0.20);
+}
+
+.brand h1 {
+    margin: 0;
+
+    font-size: 22px;
+    font-weight: 800;
+
+    color: #20283a;
+}
+
+.brand p {
+    margin: 3px 0 0;
+
+    font-size: 11px;
+
+    color: #8a93a5;
+}
+
+
+/* =========================
+   MAIN NAVIGATION
+========================= */
+
+.main-nav {
+    width: 100%;
+
+    background: white;
+
+    border: 1px solid #e8ebf1;
+
+    border-radius: 14px;
+
+    margin-bottom: 22px;
+
+    box-shadow:
+        0 5px 18px rgba(30, 45, 80, 0.06);
+
+    overflow: hidden;
+}
+
+.nav-inner {
+    display: flex;
+    align-items: center;
+
+    gap: 4px;
+
+    padding: 6px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+
+    padding: 11px 16px;
+
+    border-radius: 10px;
+
+    text-decoration: none;
+
+    color: #737c8f;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    white-space: nowrap;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.nav-item i {
+    font-size: 13px;
+}
+
+.nav-item:hover {
+    background: #f4f7ff;
+    color: #416ee8;
+}
+
+.nav-item.active {
+    background: #416ee8;
+    color: white;
+
+    box-shadow:
+        0 5px 12px rgba(65, 110, 232, 0.20);
+}
+
+.nav-item.active:hover {
+    background: #416ee8;
+    color: white;
+}
+
+
+/* =========================
+   MOBILE NAV
+========================= */
+
+@media (max-width: 700px) {
+
+    .top-header {
+        margin-bottom: 14px;
+    }
+
+    .brand-icon {
+        width: 40px;
+        height: 40px;
+
+        border-radius: 11px;
+    }
+
+    .brand h1 {
+        font-size: 19px;
+    }
+
+    .main-nav {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .main-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-inner {
+        width: max-content;
+        min-width: 100%;
+    }
+
+    .nav-item {
+        padding: 10px 13px;
+    }
+
+    .nav-item span {
+        font-size: 11px;
+    }
+}
