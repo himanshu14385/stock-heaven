@@ -1139,28 +1139,14 @@ footer {
 
 .side-stocks {
     position: fixed;
-
     top: 150px;
-
-    /*
-       1180px main page ke
-       bilkul left ke bahar
-    */
-    left: calc(50% - 590px - 185px);
-
-    width: 165px;
-
+    left: calc(50% - 590px - 245px);
+    width: 245px;
     background: #ffffff;
-
     border: 1px solid #e8ebf1;
-
     border-radius: 14px;
-
     padding: 12px;
-
-    box-shadow:
-        0 8px 25px rgba(30, 45, 80, 0.06);
-
+    box-shadow: 0 8px 25px rgba(30, 45, 80, 0.06);
     z-index: 50;
 }
 
@@ -1179,7 +1165,7 @@ footer {
 
     color: #20283a;
 
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
 }
 
