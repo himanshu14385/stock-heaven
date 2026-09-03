@@ -29,9 +29,21 @@ async function analyzeStock() {
 
         const history = result.history || [];
 
-        if (history.length < 200) {
+        /*
+           Minimum history requirement:
+           Selected newer ETFs can work with 100 days.
+           All other stocks/ETFs still require 200 days.
+        */
+        const minimumDaysByStock = {
+            NIFTYCASE: 100,
+        };
+
+        const minimumDays =
+            minimumDaysByStock[stock] || 200;
+
+        if (history.length < minimumDays) {
             throw new Error(
-                "200 days ka data available nahi hai"
+                `${minimumDays} days ka data available nahi hai`
             );
         }
 
@@ -489,9 +501,11 @@ async function analyzeStock() {
 
         setText(
             "dma200Status",
-            price > dma200
-                ? "Price above"
-                : "Price below"
+            dma200 !== null
+                ? (price > dma200
+                    ? "Price above"
+                    : "Price below")
+                : "Not enough data"
         );
 
 
@@ -526,7 +540,7 @@ async function analyzeStock() {
             trendScore += 5;
         }
 
-        if (price > dma200) {
+        if (dma200 !== null && price > dma200) {
             trendScore += 5;
         }
 
@@ -534,7 +548,7 @@ async function analyzeStock() {
             trendScore += 2.5;
         }
 
-        if (dma50 > dma200) {
+        if (dma200 !== null && dma50 !== null && dma50 > dma200) {
             trendScore += 2.5;
         }
 
@@ -593,7 +607,7 @@ async function analyzeStock() {
             maScore += 5;
         }
 
-        if (price > dma200) {
+        if (dma200 !== null && price > dma200) {
             maScore += 5;
         }
 
@@ -616,7 +630,7 @@ async function analyzeStock() {
         let riskScore = 5;
 
 
-        if (price > dma200) {
+        if (dma200 !== null && price > dma200) {
             riskScore += 3;
         }
 
@@ -852,6 +866,7 @@ async function analyzeStock() {
         if (
             price > dma20 &&
             price > dma50 &&
+            dma200 !== null &&
             price > dma200
         ) {
 
@@ -862,6 +877,7 @@ async function analyzeStock() {
                 "KEEP ON WATCH";
 
         } else if (
+            dma200 !== null &&
             price < dma200
         ) {
 
@@ -1054,6 +1070,7 @@ function generateInsights(
     if (
         price > dma20 &&
         price > dma50 &&
+        dma200 !== null &&
         price > dma200
     ) {
 
