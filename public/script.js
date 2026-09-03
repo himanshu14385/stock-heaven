@@ -36,7 +36,7 @@ async function analyzeStock() {
         */
         
         const minimumDaysByStock = {
-            NIFTYCASE: 24,
+            NIFTYCASE: 20,
         };
         
         const minimumDays =
