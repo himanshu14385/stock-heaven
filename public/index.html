@@ -1,182 +1,634 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Stock Analyzer</title>
+
     <link rel="stylesheet" href="style.css">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
 </head>
 
 <body>
 
-<div class="container">
+<div class="page">
 
-    <!-- Header -->
-    <header>
-        <div>
-            <h1>Stock Analyzer</h1>
-            <p>Analyze stocks based on your custom conditions</p>
+    <!-- HEADER -->
+    <header class="top-header">
+
+        <div class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+
+            <div>
+                <h1>Stock Analyzer</h1>
+                <p>Analyze stocks based on your custom conditions</p>
+            </div>
         </div>
+
+        <div class="header-right">
+            <div class="market-badge">
+                🇮🇳 <span>NSE</span>
+            </div>
+
+            <div class="theme-toggle">
+                <i class="fa-solid fa-sun"></i>
+                <i class="fa-solid fa-moon"></i>
+            </div>
+        </div>
+
     </header>
 
-    <!-- Search -->
+
+    <!-- SEARCH -->
     <section class="search-section">
-        <input 
-            type="text" 
-            id="stockInput" 
-            placeholder="Enter stock name or symbol e.g. RELIANCE"
-        >
-        <button onclick="analyzeStock()">Analyze</button>
+
+        <div class="search-box">
+
+            <i class="fa-solid fa-magnifying-glass"></i>
+
+            <input
+                type="text"
+                id="stockInput"
+                placeholder="Enter stock name or symbol e.g. RELIANCE"
+                onkeydown="handleSearch(event)"
+            >
+
+        </div>
+
+        <button class="analyze-btn" onclick="analyzeStock()">
+            <i class="fa-solid fa-chart-line"></i>
+            Analyze
+        </button>
+
     </section>
 
-    <!-- Stock Overview -->
-    <section class="overview">
 
-        <div class="stock-name">
-            <span id="stockSymbol">RELIANCE</span>
-            <small id="stockExchange">NSE</small>
+    <!-- STOCK OVERVIEW -->
+    <section class="stock-overview">
+
+        <div class="stock-main">
+
+            <div class="stock-title">
+                <h2 id="stockSymbol">RELIANCE</h2>
+
+                <div class="stock-subtitle">
+                    <span class="exchange-pill">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span id="stockExchange">NSE</span>
+                    </span>
+
+                    <span id="companyName">
+                        Reliance Industries Limited
+                    </span>
+                </div>
+            </div>
+
+            <div class="price-box">
+
+                <div class="price" id="stockPrice">
+                    ₹--
+                </div>
+
+                <div class="price-change" id="stockChange">
+                    --
+                </div>
+
+                <small>Today</small>
+
+            </div>
+
         </div>
 
-        <div class="price">
-            <span id="stockPrice">--</span>
+
+        <div class="overview-grid">
+
+            <div class="stat-item">
+                <div class="stat-icon green">
+                    <i class="fa-solid fa-arrow-up"></i>
+                </div>
+
+                <div>
+                    <span>Open</span>
+                    <strong id="openPrice">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon green">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                </div>
+
+                <div>
+                    <span>High</span>
+                    <strong id="dayHigh">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon red">
+                    <i class="fa-solid fa-arrow-trend-down"></i>
+                </div>
+
+                <div>
+                    <span>Low</span>
+                    <strong id="dayLow">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon purple">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+
+                <div>
+                    <span>Prev. Close</span>
+                    <strong id="previousClose">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon blue">
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+
+                <div>
+                    <span>Volume</span>
+                    <strong id="volumeTop">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon green">
+                    <i class="fa-solid fa-bullseye"></i>
+                </div>
+
+                <div>
+                    <span>52W High</span>
+                    <strong id="high52Top">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon red">
+                    <i class="fa-solid fa-bullseye"></i>
+                </div>
+
+                <div>
+                    <span>52W Low</span>
+                    <strong id="low52Top">--</strong>
+                </div>
+            </div>
+
+
+            <div class="stat-item">
+                <div class="stat-icon purple">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+
+                <div>
+                    <span>Currency</span>
+                    <strong id="currency">INR</strong>
+                </div>
+            </div>
+
         </div>
 
-        <div class="change" id="stockChange">
+    </section>
+
+
+    <!-- KEY HIGHLIGHTS -->
+    <section class="card highlights-card">
+
+        <div class="section-title">
+            <i class="fa-regular fa-star"></i>
+            <h2>Key Highlights</h2>
+        </div>
+
+        <div class="highlight-grid">
+
+            <div class="highlight">
+                <div class="highlight-icon green">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+
+                <div>
+                    <span>Near 52W High</span>
+                    <strong id="nearHigh">--</strong>
+                </div>
+            </div>
+
+
+            <div class="highlight">
+                <div class="highlight-icon green">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+
+                <div>
+                    <span>From 52W Low</span>
+                    <strong id="fromLow">--</strong>
+                </div>
+            </div>
+
+
+            <div class="highlight">
+                <div class="highlight-icon blue">
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+
+                <div>
+                    <span>20D Avg Volume</span>
+                    <strong id="avgVolume">--</strong>
+                </div>
+            </div>
+
+
+            <div class="highlight">
+                <div class="highlight-icon blue">
+                    <i class="fa-solid fa-chart-simple"></i>
+                </div>
+
+                <div>
+                    <span>Current Volume</span>
+                    <strong id="currentVolume">--</strong>
+                </div>
+            </div>
+
+
+            <div class="highlight">
+                <div class="highlight-icon green">
+                    <i class="fa-solid fa-percent"></i>
+                </div>
+
+                <div>
+                    <span>Vol. vs Avg.</span>
+                    <strong id="volumeVsAverage">--</strong>
+                </div>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- SCORE AREA -->
+    <section class="score-layout">
+
+        <!-- OVERALL SCORE -->
+        <div class="card overall-card">
+
+            <div class="section-title center">
+                <i class="fa-solid fa-bullseye"></i>
+                <h2>Overall Score</h2>
+            </div>
+
+            <div class="score-ring">
+
+                <svg viewBox="0 0 200 200">
+
+                    <circle
+                        class="score-bg"
+                        cx="100"
+                        cy="100"
+                        r="78"
+                    />
+
+                    <circle
+                        id="scoreProgress"
+                        class="score-progress"
+                        cx="100"
+                        cy="100"
+                        r="78"
+                    />
+
+                </svg>
+
+                <div class="score-number">
+                    <strong id="score">--</strong>
+                    <span>/100</span>
+                </div>
+
+            </div>
+
+            <div id="signal" class="signal neutral">
+                Waiting for analysis
+            </div>
+
+            <p id="scoreDescription" class="score-description">
+                Analyze a stock to see its technical strength.
+            </p>
+
+        </div>
+
+
+        <!-- SCORE BREAKDOWN -->
+        <div class="card breakdown-card">
+
+            <div class="section-title">
+                <i class="fa-solid fa-list-check"></i>
+                <h2>Score Breakdown</h2>
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-arrow-trend-up green-text"></i>
+                    <span>Trend</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="trendBar"></div>
+                </div>
+
+                <strong id="trendScore">-- / 20</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-rocket blue-text"></i>
+                    <span>Momentum</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="momentumBar"></div>
+                </div>
+
+                <strong id="momentumScore">-- / 20</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-wave-square orange-text"></i>
+                    <span>RSI</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="rsiBar"></div>
+                </div>
+
+                <strong id="rsiScore">-- / 10</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-chart-line purple-text"></i>
+                    <span>Moving Average</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="maBar"></div>
+                </div>
+
+                <strong id="maScore">-- / 15</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-chart-column blue-text"></i>
+                    <span>Volume</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="volumeBar"></div>
+                </div>
+
+                <strong id="volumeScore">-- / 10</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-tag green-text"></i>
+                    <span>Valuation</span>
+                </div>
+
+                <div class="score-bar disabled">
+                    <div></div>
+                </div>
+
+                <strong class="coming-soon">Coming Soon</strong>
+
+            </div>
+
+
+            <div class="score-row">
+
+                <div class="score-label">
+                    <i class="fa-solid fa-shield-halved red-text"></i>
+                    <span>Risk</span>
+                </div>
+
+                <div class="score-bar">
+                    <div id="riskBar"></div>
+                </div>
+
+                <strong id="riskScore">-- / 10</strong>
+
+            </div>
+
+
+            <div class="total-score">
+                <span>Total Score</span>
+                <strong id="totalScore">-- / 85</strong>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- TECHNICAL + INSIGHTS -->
+    <section class="bottom-layout">
+
+
+        <!-- TECHNICAL -->
+        <div class="card technical-card">
+
+            <div class="section-title">
+                <i class="fa-solid fa-chart-line"></i>
+                <h2>Technical Indicators</h2>
+            </div>
+
+
+            <div class="indicator-grid">
+
+
+                <div class="indicator-card orange-bg">
+
+                    <div class="indicator-icon orange">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+
+                    <span>RSI (14)</span>
+
+                    <strong id="rsi">--</strong>
+
+                    <small id="rsiStatus">--</small>
+
+                </div>
+
+
+                <div class="indicator-card green-bg">
+
+                    <div class="indicator-icon green">
+                        <i class="fa-solid fa-rocket"></i>
+                    </div>
+
+                    <span>20 DMA</span>
+
+                    <strong id="dma20">--</strong>
+
+                    <small id="dma20Status">--</small>
+
+                </div>
+
+
+                <div class="indicator-card blue-bg">
+
+                    <div class="indicator-icon blue">
+                        <i class="fa-solid fa-rocket"></i>
+                    </div>
+
+                    <span>50 DMA</span>
+
+                    <strong id="dma50">--</strong>
+
+                    <small id="dma50Status">--</small>
+
+                </div>
+
+
+                <div class="indicator-card purple-bg">
+
+                    <div class="indicator-icon purple">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+
+                    <span>200 DMA</span>
+
+                    <strong id="dma200">--</strong>
+
+                    <small id="dma200Status">--</small>
+
+                </div>
+
+
+                <div class="indicator-card green-bg">
+
+                    <div class="indicator-icon green">
+                        <i class="fa-solid fa-chart-column"></i>
+                    </div>
+
+                    <span>Volume</span>
+
+                    <strong id="volume">--</strong>
+
+                    <small id="volumeStatus">--</small>
+
+                </div>
+
+
+                <div class="indicator-card red-bg">
+
+                    <div class="indicator-icon red">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+
+                    <span>52W High</span>
+
+                    <strong id="high52">--</strong>
+
+                    <small id="high52Status">--</small>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- INSIGHTS -->
+        <div class="card insights-card">
+
+            <div class="section-title">
+                <i class="fa-solid fa-lightbulb"></i>
+                <h2>Signals & Insights</h2>
+            </div>
+
+            <div id="insights">
+
+                <div class="empty-insight">
+                    Analyze a stock to see signals.
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- OUR TAKE -->
+    <section class="card our-take">
+
+        <div class="take-icon">
+            🎯
+        </div>
+
+        <div class="take-content">
+
+            <h2>Our Take</h2>
+
+            <p id="ourTake">
+                Analyze a stock to generate an automated technical summary.
+            </p>
+
+        </div>
+
+        <div id="takeBadge" class="take-badge">
             --
         </div>
 
     </section>
 
-    <!-- Chart -->
-    <section class="card chart-card">
 
-        <div class="card-header">
-            <h2>Price Chart</h2>
-
-            <div class="time-buttons">
-                <button class="active">1M</button>
-                <button>3M</button>
-                <button>6M</button>
-                <button>1Y</button>
-            </div>
-        </div>
-
-        <div class="chart-placeholder">
-            <div class="chart-line"></div>
-            <span>Price Chart</span>
-        </div>
-
-    </section>
-
-    <!-- Score -->
-    <section class="score-section">
-
-        <div class="card score-card">
-
-            <h2>Overall Score</h2>
-
-            <div class="score-circle">
-                <span id="score">--</span>
-                <small>/100</small>
-            </div>
-
-            <div id="signal" class="signal">
-                Waiting for analysis
-            </div>
-
-        </div>
-
-        <div class="card breakdown-card">
-
-            <h2>Score Breakdown</h2>
-
-            <div class="score-row">
-                <span>Trend</span>
-                <strong id="trendScore">-- / 20</strong>
-            </div>
-
-            <div class="score-row">
-                <span>Momentum</span>
-                <strong id="momentumScore">-- / 20</strong>
-            </div>
-
-            <div class="score-row">
-                <span>RSI</span>
-                <strong id="rsiScore">-- / 10</strong>
-            </div>
-
-            <div class="score-row">
-                <span>Moving Average</span>
-                <strong id="maScore">-- / 15</strong>
-            </div>
-
-            <div class="score-row">
-                <span>Volume</span>
-                <strong id="volumeScore">-- / 10</strong>
-            </div>
-
-            <div class="score-row">
-                <span>Valuation</span>
-                <strong id="valuationScore">-- / 15</strong>
-            </div>
-
-            <div class="score-row">
-                <span>Risk</span>
-                <strong id="riskScore">-- / 10</strong>
-            </div>
-
-        </div>
-
-    </section>
-
-    <!-- Indicators -->
-    <section class="card indicators">
-
-        <h2>Technical Indicators</h2>
-
-        <div class="indicator-grid">
-
-            <div class="indicator">
-                <span>RSI</span>
-                <strong id="rsi">--</strong>
-            </div>
-
-            <div class="indicator">
-                <span>20 DMA</span>
-                <strong id="dma20">--</strong>
-            </div>
-
-            <div class="indicator">
-                <span>50 DMA</span>
-                <strong id="dma50">--</strong>
-            </div>
-
-            <div class="indicator">
-                <span>200 DMA</span>
-                <strong id="dma200">--</strong>
-            </div>
-
-            <div class="indicator">
-                <span>Volume</span>
-                <strong id="volume">--</strong>
-            </div>
-
-            <div class="indicator">
-                <span>52W High</span>
-                <strong id="high52">--</strong>
-            </div>
-
-        </div>
-
-    </section>
-
+    <!-- FOOTER -->
     <footer>
-        <p>Stock Analyzer • Data will be connected in the next step</p>
+        <p>
+            Stock Analyzer • Technical analysis based on available market data
+        </p>
     </footer>
 
 </div>
 
 <script src="script.js"></script>
+
 </body>
 </html>
