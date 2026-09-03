@@ -1130,3 +1130,162 @@ footer {
         font-size: 9.5px;
     }
 }
+
+/* side stock name ----- */
+
+/* =========================
+   SIDE STOCK WATCHLIST
+========================= */
+
+.side-stocks {
+    position: fixed;
+
+    top: 150px;
+
+    /*
+       1180px main page ke
+       bilkul left ke bahar
+    */
+    left: calc(50% - 590px - 185px);
+
+    width: 165px;
+
+    background: #ffffff;
+
+    border: 1px solid #e8ebf1;
+
+    border-radius: 14px;
+
+    padding: 12px;
+
+    box-shadow:
+        0 8px 25px rgba(30, 45, 80, 0.06);
+
+    z-index: 50;
+}
+
+
+/* TITLE */
+
+.side-stocks-title {
+    display: flex;
+    align-items: center;
+
+    gap: 7px;
+
+    padding: 5px 6px 11px;
+
+    border-bottom: 1px solid #eef1f5;
+
+    color: #20283a;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.side-stocks-title i {
+    color: #416ee8;
+
+    font-size: 12px;
+}
+
+
+/* LIST */
+
+.side-stock-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 2px;
+
+    margin-top: 7px;
+}
+
+
+/* STOCK BUTTON */
+
+.side-stock {
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 6px;
+
+    padding: 9px 7px;
+
+    border: none;
+
+    background: transparent;
+
+    border-radius: 9px;
+
+    cursor: pointer;
+
+    text-align: left;
+
+    transition:
+        background 0.18s ease,
+        transform 0.18s ease;
+}
+
+.side-stock:hover {
+    background: #f3f6ff;
+
+    transform: translateX(2px);
+}
+
+
+/* STOCK NAME */
+
+.side-stock-name {
+    font-size: 11px;
+
+    font-weight: 700;
+
+    color: #30394b;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+
+/* SYMBOL */
+
+.side-stock-symbol {
+    font-size: 8px;
+
+    font-weight: 700;
+
+    color: #8b94a5;
+
+    white-space: nowrap;
+}
+
+.side-stock:hover .side-stock-name {
+    color: #416ee8;
+}
+
+.side-stock:hover .side-stock-symbol {
+    color: #416ee8;
+}
+
+/* =========================
+   HIDE SIDE STOCKS
+   WHEN SCREEN IS SMALL
+========================= */
+
+@media (max-width: 1450px) {
+
+    .side-stocks {
+        display: none;
+    }
+
+}
