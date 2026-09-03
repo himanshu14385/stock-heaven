@@ -223,12 +223,13 @@ body {
 .stat-icon,
 .highlight-icon,
 .indicator-icon {
-    min-width: 35px;
+    width: 35px;
     height: 35px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 10px;
 }
 
 .green {
