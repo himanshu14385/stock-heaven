@@ -47,7 +47,9 @@
 
 
     <!-- SEARCH -->
-    <section class="search-section">
+<section class="search-section">
+
+    <div class="search-wrapper">
 
         <div class="search-box">
 
@@ -56,18 +58,30 @@
             <input
                 type="text"
                 id="stockInput"
-                placeholder="Enter stock name or symbol e.g. RELIANCE"
+                placeholder="Search stock name or symbol..."
+                autocomplete="off"
+                oninput="showStockSuggestions()"
                 onkeydown="handleSearch(event)"
             >
 
         </div>
 
-        <button class="analyze-btn" onclick="analyzeStock()">
-            <i class="fa-solid fa-chart-line"></i>
-            Analyze
-        </button>
+        <div
+            id="stockSuggestions"
+            class="stock-suggestions"
+        ></div>
 
-    </section>
+    </div>
+
+    <button
+        class="analyze-btn"
+        onclick="analyzeStock()"
+    >
+        <i class="fa-solid fa-chart-line"></i>
+        Analyze
+    </button>
+
+</section>
 
 
     <!-- STOCK OVERVIEW -->
