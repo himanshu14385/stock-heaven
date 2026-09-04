@@ -195,6 +195,12 @@ async function loadStuckStocks() {
                 <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
             </div>
             <div class="stuck-row-right">
+                ${editingStuckIndex !== index
+                    ? `<div class="stuck-actions" onclick="event.stopPropagation()">
+                        <button class="stuck-action stuck-edit" onclick="editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="stuck-action stuck-delete" onclick="deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                       </div>`
+                    : ``}			
                 <div class="ssname-wrap">
                     <span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span>
                     ${editingStuckIndex === index
@@ -205,12 +211,6 @@ async function loadStuckStocks() {
                           </div>`
                         : `<span class="mystuckprice">${escapeStuckHtml(stock.stuckInfo)}</span>`}
                 </div>
-                ${editingStuckIndex !== index
-                    ? `<div class="stuck-actions" onclick="event.stopPropagation()">
-                        <button class="stuck-action stuck-edit" onclick="editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                        <button class="stuck-action stuck-delete" onclick="deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
-                       </div>`
-                    : ``}
             </div>
         </div>
     `).join("");
