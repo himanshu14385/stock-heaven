@@ -237,12 +237,24 @@
 	  </div>
 	  <div class="summary-card valuation-card">
 		<div class="summary-section-head"><h2>MARKET STATISTICS</h2><span>Live market data</span></div>
-		<div class="valuation-list">
-		  <div><span>Day Range</span><strong id="dayRange">--</strong></div>
-		  <div><span>52W Range</span><strong id="yearRange">--</strong></div>
-		  <div><span>Currency</span><strong id="currency">INR</strong></div>
+		<div class="market-stat-columns">
+		  <div>
+			<div class="valuation-list">
+			  <div><span>Day Range</span><strong id="dayRange">--</strong></div>
+			  <div><span>52W Range</span><strong id="yearRange">--</strong></div>
+			  <div><span>Currency</span><strong id="currency">INR</strong></div>
+			</div>
+			<div class="valuation-message market-message"><strong id="marketStatus">Market data connected</strong><p id="marketStatusText">Values are calculated from the current market-data feed.</p></div>
+		  </div>
+		  <div class="market-movers">
+			<div class="market-tabs">
+			  <button class="market-tab active" data-market-tab="gainers">Top Gainer</button>
+			  <button class="market-tab" data-market-tab="losers">Top Losers</button>
+			  <button class="market-tab" data-market-tab="low52">52W Low</button>
+			</div>
+			<div id="marketMoverList" class="market-mover-list"><div class="market-empty">Loading market movers...</div></div>
+		  </div>
 		</div>
-		<div class="valuation-message market-message"><strong id="marketStatus">Market data connected</strong><p id="marketStatusText">Values are calculated from the current market-data feed.</p></div>
 	  </div>
 	</section>
 

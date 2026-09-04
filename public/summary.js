@@ -119,9 +119,10 @@ async function renderPeerComparison(selectedSymbol){
 
   // IMPORTANT: keep the existing dynamic competitor list exactly as it is,
   // and only add the currently selected stock as the first row.
-  const [competitors, selectedData] = await Promise.all([
+  const [competitors, selectedData, selectedPE] = await Promise.all([
     fetchDynamicPeers(selectedSymbol),
-    getPeerData(selectedSymbol)
+    getPeerData(selectedSymbol),
+    fetch(`/api/pe?symbol=${encodeURIComponent(selectedSymbol)}`).then(r=>r.json()).catch(()=>({pe:null}))
   ]);
 
   const selectedClean=cleanSummarySymbol(selectedSymbol);
@@ -130,7 +131,7 @@ async function renderPeerComparison(selectedSymbol){
     symbol:selectedClean,
     name:selectedName,
     ltp:selectedData?.price ?? null,
-    pe:null,
+    pe:selectedPE?.pe ?? null,
     rsi:selectedData?.rsi ?? null,
     selected:true
   };
@@ -174,6 +175,29 @@ async function renderPeerComparison(selectedSymbol){
   });
 }
 
+async function fetchMarketStats(){
+  try{
+    const r=await fetch('/api/market-stats');
+    const d=await r.json();
+    if(!r.ok||d.error) return null;
+    return d;
+  }catch(e){return null;}
+}
+function renderMarketList(items){
+  const box=document.getElementById('marketMoverList');
+  if(!box)return;
+  if(!Array.isArray(items)||!items.length){box.innerHTML='<div class="market-empty">No market data available</div>';return;}
+  box.innerHTML=items.slice(0,8).map((x,i)=>`<div class="market-mover-row"><span class="market-rank">${i+1}</span><span class="market-mover-name"><b>${escapeHtml(x.symbol||'--')}</b><small>${escapeHtml(x.name||'')}</small></span><span class="market-mover-value ${x.changePercent<0?'down':'up'}">${x.changePercent==null?'--':`${x.changePercent>=0?'+':''}${Number(x.changePercent).toFixed(2)}%`}</span></div>`).join('');
+}
+function setupMarketTabs(data){
+  const tabs=[...document.querySelectorAll('.market-tab')];
+  if(!tabs.length)return;
+  const map={gainers:'gainers',losers:'losers',low52:'low52'};
+  const activate=key=>{tabs.forEach(t=>t.classList.toggle('active',t.dataset.marketTab===key));renderMarketList(data?.[map[key]]||[]);};
+  tabs.forEach(t=>t.addEventListener('click',()=>activate(t.dataset.marketTab)));
+  activate('gainers');
+}
+
 async function showSummaryQuote(symbol){
  const normalized=cleanSummarySymbol(symbol);if(!normalized)return;
  const input=document.getElementById("stockInput"),box=document.getElementById("stockSuggestions");if(input)input.value=normalized.replace(/\.NS$/i,"");if(box){box.style.display="none";box.innerHTML="";}
@@ -203,6 +227,7 @@ async function showSummaryQuote(symbol){
   document.getElementById("drivers").innerHTML=[`<li>Price trend: ${above20?"above":"below"} 20 DMA.</li>`,`<li>20-day momentum: ${fmtPct(ret20)}.</li>`,`<li>Volume ratio: ${volRatio==null?"--":volRatio.toFixed(2)+"x"}.</li>`].join("");
   setSummary("longTerm",total>=70?"ACCUMULATE":total>=50?"WATCH":"WAIT");setSummary("shortTerm",total>=70?"BUY SETUP":total>=50?"WAIT":"AVOID");
   renderPeerComparison(normalized);
+  fetchMarketStats().then(setupMarketTabs);
  }catch(e){alert("Summary load nahi ho paaya.\n\n"+e.message);}
 }
 function quickSelectSummary(symbol){showSummaryQuote(symbol);}
