@@ -15,7 +15,7 @@ const defaultAlerts=[
 ];
 
 function loadAlerts(){try{const x=JSON.parse(localStorage.getItem(ALERT_STORAGE_KEY));if(Array.isArray(x))return x}catch(e){}return defaultAlerts}
-let alertStocks=loadAlerts(), prices={}, timer=null;
+let alertStocks=loadAlerts(), prices={}, timer=null, editingAlerts=new Set();
 
 function saveAlerts(){localStorage.setItem(ALERT_STORAGE_KEY,JSON.stringify(alertStocks))}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -55,16 +55,31 @@ function render(){
    <div class="check-col"><input class="alert-check" type="checkbox"></div>
    <div>${i+1}</div>
    <div class="stock-cell"><div class="stock-logo">${esc(logo)}</div><div class="stock-meta"><b>${esc(s.name||s.symbol)}</b><small>${esc(s.symbol)}</small></div></div>
-   <div><input class="alert-input" type="number" min="0" step="0.01" placeholder="Set price" value="${esc(s.alertPrice||"")}" oninput="setAlert(${i},this.value)"></div>
+   <div class="alert-price-cell">${editingAlerts.has(i)
+    ? `<input class="alert-input" type="number" min="0" step="0.01" placeholder="Set price" value="${esc(s.alertPrice||"")}" onkeydown="handleAlertEditKey(event,${i})" autofocus>`
+    : `<span class="alert-price-value ${s.alertPrice===""?"empty":""}">${s.alertPrice===""?"Set price":money(s.alertPrice)}</span>`}</div>
    <div class="market-cell ${Number.isFinite(change)&&change<0?"market-down":"market-up"}"><b>${money(market)}</b><small>${Number.isFinite(change)?(change>=0?"+":"")+money(Math.abs(change)).replace("₹","₹"):"--"} ${Number.isFinite(pct)?`(${pct>=0?"+":""}${pct.toFixed(2)}%)`:""}</small></div>
    <div class="diff-cell ${hit?"diff-hit":(st==="watching"?"diff-safe":"diff-none")}"><b>${diff===null?"-":(diff>=0?"+":"-")+money(Math.abs(diff))}</b><small>${diff===null?"":target?`(${((diff/target)*100).toFixed(2)}%)`:""}</small></div>
    <div><span class="status-pill ${hit?"hit":st==="watching"?"watch":"none"}"><i class="fa-solid ${hit?"fa-bell":st==="watching"?"fa-eye":"fa-bell"}"></i>${hit?"Price Hit":st==="watching"?"Watching":"No Alert"}</span></div>
-   <div><button class="action-delete" onclick="removeAlert(${i})" title="Remove"><i class="fa-solid fa-trash-can"></i></button></div>
+   <div class="action-cell">${editingAlerts.has(i)
+    ? `<button class="action-save" onclick="saveAlertEdit(${i})" title="Save"><i class="fa-solid fa-check"></i></button><button class="action-cancel" onclick="cancelAlertEdit(${i})" title="Cancel"><i class="fa-solid fa-xmark"></i></button>`
+    : `<button class="action-edit" onclick="editAlert(${i})" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="action-delete" onclick="removeAlert(${i})" title="Remove"><i class="fa-solid fa-trash-can"></i></button>`}</div>
   </div>`;
  }).join("");
 }
-function setAlert(i,v){alertStocks[i].alertPrice=v;saveAlerts();render()}
-function removeAlert(i){alertStocks.splice(i,1);delete prices[alertStocks[i]?.symbol];saveAlerts();render();refreshPrices()}
+function setAlert(i,v){alertStocks[i].alertPrice=v;saveAlerts()}
+function editAlert(i){editingAlerts.clear();editingAlerts.add(i);render();requestAnimationFrame(()=>{const input=document.querySelector(`.alert-row .alert-input`);if(input){input.focus();input.select();}})}
+function saveAlertEdit(i){
+ const input=document.querySelector(`.alert-row .alert-input`);
+ if(input) alertStocks[i].alertPrice=input.value.trim();
+ editingAlerts.delete(i);saveAlerts();render();
+}
+function cancelAlertEdit(i){editingAlerts.delete(i);render()}
+function handleAlertEditKey(event,i){
+ if(event.key==="Enter"){event.preventDefault();saveAlertEdit(i)}
+ if(event.key==="Escape"){event.preventDefault();cancelAlertEdit(i)}
+}
+function removeAlert(i){editingAlerts.delete(i);alertStocks.splice(i,1);delete prices[alertStocks[i]?.symbol];saveAlerts();render();refreshPrices()}
 function openAddStock(){document.getElementById("addStockPanel").classList.add("open");document.getElementById("addStockInput").focus()}
 function closeAddStock(){document.getElementById("addStockPanel").classList.remove("open");document.getElementById("addStockInput").value="";document.getElementById("recommendations").innerHTML=""}
 
