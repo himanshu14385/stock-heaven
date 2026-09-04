@@ -176,22 +176,77 @@ async function fetchSelectedPE(symbol) {
   try {
     const html = await fetchText(`https://www.screener.in/company/${encodeURIComponent(clean)}/`);
     if (!html) return null;
-    const m = html.match(/Stock P\/E[\s\S]{0,500}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
-              html.match(/Stock P\/E[\s\S]{0,500}?([0-9]+(?:\.[0-9]+)?)/i);
+    const m = html.match(/Stock P\/E[\s\S]{0,1200}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
+              html.match(/Stock P\/E[\s\S]{0,1200}?([0-9]+(?:\.[0-9]+)?)/i);
     return m ? num(m[1]) : null;
   } catch (_) { return null; }
 }
+
+
+const SCANX_SLUG_ALIASES = {
+  AWL: ["adani-wilmar-ltd", "adani-wilmar"],
+  ZOMATO: ["zomato-ltd", "zomato"],
+  ETERNAL: ["zomato-ltd", "zomato"],
+  TMPV: ["tata-motors-passenger-vehicles-ltd", "tata-motors-passenger-vehicles"],
+  NMDCSTEEL: ["nmdc-steel-ltd", "nmdc-steel"]
+};
+
+function normalizeCompanyName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(limited|ltd|private|pvt|inc|corporation|corp|company|co)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function findScanxSlugFromSitemap(company) {
+  try {
+    const html = await fetchText("https://scanx.trade/sitemap");
+    if (!html) return null;
+    const targetNames = uniq([company.name, company.symbol]).map(normalizeCompanyName).filter(Boolean);
+    const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']*\/company\/([^/"']+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+    let best = null;
+    let bestScore = 0;
+    for (const m of links) {
+      const slug = m[2];
+      const text = stripTags(m[3]);
+      const candidates = [normalizeCompanyName(text), normalizeCompanyName(slug.replace(/-/g, " "))];
+      let score = 0;
+      for (const t of targetNames) {
+        for (const c of candidates) {
+          if (!t || !c) continue;
+          if (t === c) score = Math.max(score, 100);
+          else if (c.includes(t) || t.includes(c)) score = Math.max(score, 80);
+          else {
+            const tw = new Set(t.split(" "));
+            const cw = new Set(c.split(" "));
+            const overlap = [...tw].filter(x => x.length > 2 && cw.has(x)).length;
+            if (overlap >= 2) score = Math.max(score, 50 + overlap);
+          }
+        }
+      }
+      if (score > bestScore) { bestScore = score; best = slug; }
+    }
+    return bestScore >= 80 ? best : null;
+  } catch (_) { return null; }
+}
+
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
 
+  const cleanSymbol = String(company.symbol || symbol).toUpperCase().replace(/\.NS$/i, "");
   const base = slugifyName(company.name);
   const variants = uniq([
+    ...(SCANX_SLUG_ALIASES[cleanSymbol] || []),
     base,
     base.replace(/-ltd$/, "-limited"),
     base.replace(/-limited$/, "-ltd"),
     base.replace(/-limited$/, ""),
-    String(company.symbol).toLowerCase()
+    base.replace(/-ltd$/, ""),
+    cleanSymbol.toLowerCase()
   ]);
 
   for (const slug of variants) {
@@ -203,6 +258,20 @@ async function fetchDynamicPeers(symbol) {
       return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
     }
   }
+
+  // Final fallback: resolve the ScanX company URL from its public sitemap.
+  const sitemapSlug = await findScanxSlugFromSitemap(company);
+  if (sitemapSlug && !variants.includes(sitemapSlug)) {
+    const html = await fetchText(`https://scanx.trade/company/${encodeURIComponent(sitemapSlug)}/`);
+    if (html) {
+      const peers = parsePeerTables(html, company);
+      if (peers.length) {
+        const selected = await fetchSelectedMetrics(company.symbol, company.name);
+        return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
+      }
+    }
+  }
+
   return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", peers: [] };
 }
 
@@ -259,6 +328,7 @@ export default {
       if (!symbol) return json({ pe: null });
       return json({ pe: await fetchSelectedPE(symbol) });
     }
+
 
     if (url.pathname === "/api/stock") {
       const rawSymbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
