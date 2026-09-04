@@ -1,40 +1,39 @@
-const stuckStocks = [
-    {
-        symbol: "AWL",
-        name: "Adani Wilmar Limited",
-        stuckInfo: "208 × 647.73"
-    },
-    {
-        symbol: "ADANIENSOL",
-        name: "Adani Energy Solutions Limited",
-        stuckInfo: "33 × 2788.12"
-    },
-    {
-        symbol: "AWL",
-        name: "Adani Wilmar Limited",
-        stuckInfo: "36 × 683.35"
-    },
-    {
-        symbol: "ADANIGREEN",
-        name: "Adani Green Energy",
-        stuckInfo: "9 × 2333.43"
-    },	
-    {
-        symbol: "FMCGIETF.NS",
-        name: "ICICI Pru Nifty FMCG ETF",
-        stuckInfo: "550 × 56.07"
-    },
-    {
-        symbol: "TMPV",
-        name: "Tata Motors Passenger Vehicles",
-        stuckInfo: "27 × 508.60"
-    },
-    {
-        symbol: "NSLNISP",
-        name: "NMDC Steel",
-        stuckInfo: "31 × 52.85"
-    }
+const STUCK_STORAGE_KEY = "stockHeavenStuckStocks";
+
+const defaultStuckStocks = [
+    { symbol: "AWL", name: "Adani Wilmar Limited", stuckInfo: "208 × 647.73" },
+    { symbol: "ADANIENSOL", name: "Adani Energy Solutions Limited", stuckInfo: "33 × 2788.12" },
+    { symbol: "AWL", name: "Adani Wilmar Limited", stuckInfo: "36 × 683.35" },
+    { symbol: "ADANIGREEN", name: "Adani Green Energy", stuckInfo: "9 × 2333.43" },
+    { symbol: "FMCGIETF.NS", name: "ICICI Pru Nifty FMCG ETF", stuckInfo: "550 × 56.07" },
+    { symbol: "TMPV", name: "Tata Motors Passenger Vehicles", stuckInfo: "27 × 508.60" },
+    { symbol: "NSLNISP", name: "NMDC Steel", stuckInfo: "31 × 52.85" }
 ];
+
+function loadStuckStockSettings() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(STUCK_STORAGE_KEY));
+        if (Array.isArray(saved)) return saved;
+    } catch (_) {}
+    return defaultStuckStocks.map(stock => ({ ...stock }));
+}
+
+let stuckStocks = loadStuckStockSettings();
+let editingStuckIndex = null;
+
+function saveStuckStockSettings() {
+    localStorage.setItem(STUCK_STORAGE_KEY, JSON.stringify(stuckStocks));
+}
+
+function escapeStuckHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    }[char]));
+}
 
 function cleanSymbol(symbol) {
     return String(symbol || "").trim().toUpperCase();
@@ -189,18 +188,88 @@ async function loadStuckStocks() {
         }))
     );
 
-    container.innerHTML = results.map(stock => `
-        <button class="stuck-stock-row" onclick="showStuckQuote('${stock.symbol.replace(/'/g, "\\'")}')">
-            <div class="ssname-wrap"><span class="stuck-stock-name">${stock.name}</span><span class="mystuckprice dnone">${stock.stuckInfo}</span></div>
-            <div class="ssname-wrap"><span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span><span class="mystuckprice">${stock.stuckInfo}</span></div>
-        </button>
+    container.innerHTML = results.map((stock, index) => `
+        <div class="stuck-stock-row" onclick="showStuckQuote('${stock.symbol.replace(/'/g, "\'")}')">
+            <div class="ssname-wrap">
+                <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
+                <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
+            </div>
+            <div class="stuck-row-right">
+                <div class="ssname-wrap">
+                    <span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span>
+                    ${editingStuckIndex === index
+                        ? `<div class="stuck-edit-wrap" onclick="event.stopPropagation()">
+                            <input class="stuck-info-input" id="stuckInfoInput${index}" type="text" value="${escapeStuckHtml(stock.stuckInfo)}" aria-label="Edit stuck stock quantity and price" onkeydown="handleStuckEditKey(event, ${index})">
+                            <button class="stuck-action stuck-save" onclick="saveStuckEdit(${index})" title="Save"><i class="fa-solid fa-check"></i></button>
+                            <button class="stuck-action stuck-cancel" onclick="cancelStuckEdit(event)" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                          </div>`
+                        : `<span class="mystuckprice">${escapeStuckHtml(stock.stuckInfo)}</span>`}
+                </div>
+                ${editingStuckIndex !== index
+                    ? `<div class="stuck-actions" onclick="event.stopPropagation()">
+                        <button class="stuck-action stuck-edit" onclick="editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="stuck-action stuck-delete" onclick="deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                       </div>`
+                    : ``}
+            </div>
+        </div>
     `).join("");
-
 
 
     if (updated) {
         updated.textContent = "Prices fetched: " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
     }
+}
+
+function editStuck(index) {
+    editingStuckIndex = index;
+    loadStuckStocks();
+}
+
+function saveStuckEdit(index) {
+    const input = document.getElementById(`stuckInfoInput${index}`);
+    if (!input) return;
+
+    const value = input.value.trim();
+    if (!value) {
+        alert("Quantity aur price enter kijiye");
+        input.focus();
+        return;
+    }
+
+    stuckStocks[index].stuckInfo = value;
+    editingStuckIndex = null;
+    saveStuckStockSettings();
+    loadStuckStocks();
+}
+
+function cancelStuckEdit(event) {
+    if (event) event.stopPropagation();
+    editingStuckIndex = null;
+    loadStuckStocks();
+}
+
+function handleStuckEditKey(event, index) {
+    if (event.key === "Enter") {
+        event.preventDefault();
+        saveStuckEdit(index);
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        editingStuckIndex = null;
+        loadStuckStocks();
+    }
+}
+
+function deleteStuck(index) {
+    const stock = stuckStocks[index];
+    if (!stock) return;
+
+    if (!confirm(`Delete ${stock.name} from Stuck Stock?`)) return;
+
+    stuckStocks.splice(index, 1);
+    editingStuckIndex = null;
+    saveStuckStockSettings();
+    loadStuckStocks();
 }
 
 document.addEventListener("DOMContentLoaded", loadStuckStocks);
