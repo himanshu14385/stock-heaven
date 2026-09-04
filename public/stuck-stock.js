@@ -1,36 +1,11 @@
 const stuckStocks = [
-    ["RELIANCE", "Reliance Industries Limited"],
-    ["AWL", "Adani Wilmar Limited"],
-    ["ADANIENSOL", "Adani Energy Solutions Limited"],
-    ["ADANIGREEN", "Adani Green Energy Ltd"],
-    ["NSLNISP", "NMDC Steel Limited"],
-    ["TMPV", "Tata Motors Passenger Vehicles"],
-    ["TATAGOLD", "Tata Gold ETF"],
-    ["TATASILV.NS", "Tata Silver ETF"],
-    ["ENERGY.NS", "Mirae Asset Nifty Energy ETF"],
-    ["CPSEETF", "CPSE ETF"],
-    ["NIFTYCASE.NS", "Zerodha Nifty 50 ETF"],
-    ["FMCGIETF.NS", "ICICI Prudential FMCG ETF"],
-    ["MIDCAPIETF.NS", "ICICI Prudential Midcap 150 ETF"],
-    ["NEXT50IETF.NS", "ICICI Prudential Nifty Next 50 ETF"],
-    ["KOTAKALPHA.NS", "Kotak Nifty Alpha 50 ETF"],
-    ["ITBEES", "Nippon India ETF Nifty IT BeES"],
-    ["HDFCNIFBAN.NS", "HDFC Nifty Bank ETF"],
-    ["SMALLCAP.NS", "Mirae Asset Nifty Smallcap 250 Momentum Quality 100 ETF"],
-    ["BANKBEES", "Nippon India ETF Nifty Bank BeES"],
-    ["GOLDBEES", "Nippon India ETF Gold BeES"],
-    ["TCS", "Tata Consultancy Services Limited"],
-    ["INFY", "Infosys Limited"],
-    ["HDFCBANK", "HDFC Bank Limited"],
-    ["ICICIBANK", "ICICI Bank Limited"],
-    ["SBIN", "State Bank of India"],
-    ["ITC", "ITC Limited"],
-    ["TATASTEEL", "Tata Steel Limited"],
-    ["JSWSTEEL", "JSW Steel Limited"],
-    ["ADANIENT", "Adani Enterprises Limited"],
-    ["ADANIPORTS", "Adani Ports and Special Economic Zone Limited"],
-    ["BEL", "Bharat Electronics Limited"],
-    ["HAL", "Hindustan Aeronautics Limited"]
+    ["AWL", "Adani Wilmar Limited", "208 × 647.73"],
+    ["ADANIENSOL", "Adani Energy Solutions Limited", "33 × 2788.12"],
+    ["FMCGIETF.NS", "ICICI Pru Nifty FMCG ETF", "550 × 56.07"],
+    ["AWL", "Adani Wilmar Limited", "36 × 683.35"],
+    ["ADANIGREEN", "Adani Green Energy", "9 × 2333.43"],
+    ["TMPV", "Tata Motors Passenger Vehicles", "27 × 508.60"],
+    ["NSLNISP", "NMDC Steel", "31 × 52.85"],
 ];
 
 function cleanSymbol(symbol) {
@@ -75,6 +50,7 @@ function showStuckSuggestions() {
     `).join("");
     box.style.display = "block";
 }
+
 
 function selectStuckStock(symbol) {
     const input = document.getElementById("stuckSearchInput");
@@ -177,10 +153,12 @@ async function loadStuckStocks() {
 
     container.innerHTML = results.map(stock => `
         <button class="stuck-stock-row" onclick="showStuckQuote('${stock.symbol.replace(/'/g, "\\'")}')">
-            <span class="stuck-stock-name">${stock.name}</span>
+            <div class="ssname-wrap"><span class="stuck-stock-name">${stock.name}</span><span class="mystuckprice">${stock.stuckInfo}</span></div>
             <span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span>
         </button>
     `).join("");
+
+
 
     if (updated) {
         updated.textContent = "Prices fetched: " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
