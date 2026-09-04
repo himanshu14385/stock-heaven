@@ -164,6 +164,18 @@
     align-items: center;
 }
 
+.ssname-wrap {
+    display: flex;
+    flex-direction: column;
+    row-gap: 6px;
+}
+
+.ssname-wrap .mystuckprice {
+    color: #d12a2a;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 @media (max-width: 900px) {
     .stuck-quote-grid {
         grid-template-columns: repeat(2, 1fr);

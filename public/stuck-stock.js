@@ -1,11 +1,39 @@
 const stuckStocks = [
-    ["AWL", "Adani Wilmar Limited", "208 × 647.73"],
-    ["ADANIENSOL", "Adani Energy Solutions Limited", "33 × 2788.12"],
-    ["FMCGIETF.NS", "ICICI Pru Nifty FMCG ETF", "550 × 56.07"],
-    ["AWL", "Adani Wilmar Limited", "36 × 683.35"],
-    ["ADANIGREEN", "Adani Green Energy", "9 × 2333.43"],
-    ["TMPV", "Tata Motors Passenger Vehicles", "27 × 508.60"],
-    ["NSLNISP", "NMDC Steel", "31 × 52.85"],
+    {
+        symbol: "AWL",
+        name: "Adani Wilmar Limited",
+        stuckInfo: "208 × 647.73"
+    },
+    {
+        symbol: "ADANIENSOL",
+        name: "Adani Energy Solutions Limited",
+        stuckInfo: "33 × 2788.12"
+    },
+    {
+        symbol: "FMCGIETF.NS",
+        name: "ICICI Pru Nifty FMCG ETF",
+        stuckInfo: "550 × 56.07"
+    },
+    {
+        symbol: "AWL",
+        name: "Adani Wilmar Limited",
+        stuckInfo: "36 × 683.35"
+    },
+    {
+        symbol: "ADANIGREEN",
+        name: "Adani Green Energy",
+        stuckInfo: "9 × 2333.43"
+    },
+    {
+        symbol: "TMPV",
+        name: "Tata Motors Passenger Vehicles",
+        stuckInfo: "27 × 508.60"
+    },
+    {
+        symbol: "NSLNISP",
+        name: "NMDC Steel",
+        stuckInfo: "31 × 52.85"
+    }
 ];
 
 function cleanSymbol(symbol) {
