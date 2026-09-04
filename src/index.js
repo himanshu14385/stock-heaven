@@ -132,6 +132,71 @@ function parsePeerTables(html, selected) {
   return best;
 }
 
+async function fetchSelectedMetrics(symbol, fallbackName) {
+  const clean = String(symbol || "").trim().toUpperCase().replace(/\.NS$/i, "");
+  let pe = null;
+  try {
+    const html = await fetchText(`https://www.screener.in/company/${encodeURIComponent(clean)}/`);
+    if (html) {
+      const m = html.match(/Stock P\/E[\s\S]{0,1200}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
+                html.match(/Stock P\/E[\s\S]{0,1200}?([0-9]+(?:\.[0-9]+)?)/i);
+      if (m) pe = num(m[1]);
+    }
+  } catch (_) {}
+  return { symbol: clean, name: fallbackName || clean, pe };
+}
+
+async function fetchYahooScreener(scrId) {
+  const u = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=50&scrIds=${encodeURIComponent(scrId)}&region=IN&lang=en-IN`;
+  try {
+    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*" } });
+    if (!r.ok) return [];
+    const body = await r.json();
+    return body?.finance?.result?.[0]?.quotes || [];
+  } catch (_) { return []; }
+}
+function marketQuote(q) {
+  const symbol = String(q.symbol || "").toUpperCase();
+  if (!symbol.endsWith(".NS")) return null;
+  const name = q.longName || q.shortName || symbol.replace(/\.NS$/i, "");
+  const price = Number(q.regularMarketPrice);
+  const changePercent = Number(q.regularMarketChangePercent);
+  return {
+    symbol: symbol.replace(/\.NS$/i, ""),
+    name,
+    price: Number.isFinite(price) ? price : null,
+    changePercent: Number.isFinite(changePercent) ? changePercent : null,
+    distanceFrom52Low: Number.isFinite(Number(q.fiftyTwoWeekLow)) && Number.isFinite(price) && Number(q.fiftyTwoWeekLow) > 0
+      ? ((price - Number(q.fiftyTwoWeekLow)) / Number(q.fiftyTwoWeekLow)) * 100 : null
+  };
+}
+
+async function fetchSelectedPE(symbol) {
+  const clean = String(symbol || "").trim().toUpperCase().replace(/\.NS$/i, "");
+  try {
+    const html = await fetchText(`https://www.screener.in/company/${encodeURIComponent(clean)}/`);
+    if (!html) return null;
+    const m = html.match(/Stock P\/E[\s\S]{0,500}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
+              html.match(/Stock P\/E[\s\S]{0,500}?([0-9]+(?:\.[0-9]+)?)/i);
+    return m ? num(m[1]) : null;
+  } catch (_) { return null; }
+}
+async function fetchYahooScreener(scrId) {
+  const u = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=50&scrIds=${encodeURIComponent(scrId)}&region=IN&lang=en-IN`;
+  try {
+    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*" } });
+    if (!r.ok) return [];
+    const body = await r.json();
+    return body?.finance?.result?.[0]?.quotes || [];
+  } catch (_) { return []; }
+}
+function marketQuote(q) {
+  const symbol = String(q.symbol || "").toUpperCase();
+  if (!symbol.endsWith(".NS")) return null;
+  const price = Number(q.regularMarketPrice), changePercent = Number(q.regularMarketChangePercent), low = Number(q.fiftyTwoWeekLow);
+  return { symbol:symbol.replace(/\.NS$/i,""), name:q.longName||q.shortName||symbol.replace(/\.NS$/i,""), price:Number.isFinite(price)?price:null, changePercent:Number.isFinite(changePercent)?changePercent:null, distanceFrom52Low:Number.isFinite(price)&&Number.isFinite(low)&&low>0?((price-low)/low)*100:null };
+}
+
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
@@ -149,7 +214,10 @@ async function fetchDynamicPeers(symbol) {
     const html = await fetchText(`https://scanx.trade/company/${encodeURIComponent(slug)}/`);
     if (!html) continue;
     const peers = parsePeerTables(html, company);
-    if (peers.length) return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", peers: peers.slice(0, 10) };
+    if (peers.length) {
+      const selected = await fetchSelectedMetrics(company.symbol, company.name);
+      return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
+    }
   }
   return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", peers: [] };
 }
@@ -180,6 +248,49 @@ export default {
       if (!symbol) return json({ error: "Stock symbol missing" }, 400);
       try { return json(await fetchDynamicPeers(symbol)); }
       catch (_) { return json({ error: "Unable to fetch peer comparison" }, 502); }
+    }
+
+    if (url.pathname === "/api/market-stats") {
+      try {
+        const [gRaw, lRaw, lowRaw] = await Promise.all([
+          fetchYahooScreener("day_gainers"),
+          fetchYahooScreener("day_losers"),
+          fetchYahooScreener("52_week_lows")
+        ]);
+        const mapList = raw => raw.map(marketQuote).filter(Boolean);
+        const gainers = mapList(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
+        const losers = mapList(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
+        let low52 = mapList(lowRaw);
+        if (!low52.length) {
+          const alt = await fetchYahooScreener("fifty_two_wk_losers");
+          low52 = mapList(alt);
+        }
+        low52 = low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999)).slice(0,8);
+        return json({ gainers, losers, low52 });
+      } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
+    }
+
+    if (url.pathname === "/api/pe") {
+      const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
+      if (!symbol) return json({ pe: null });
+      return json({ pe: await fetchSelectedPE(symbol) });
+    }
+
+    if (url.pathname === "/api/market-stats") {
+      try {
+        const [gRaw, lRaw, lowRaw] = await Promise.all([
+          fetchYahooScreener("day_gainers"),
+          fetchYahooScreener("day_losers"),
+          fetchYahooScreener("52_week_lows")
+        ]);
+        const clean = raw => raw.map(marketQuote).filter(Boolean);
+        const gainers = clean(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
+        const losers = clean(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
+        let low52 = clean(lowRaw);
+        if (!low52.length) low52 = clean(await fetchYahooScreener("fifty_two_wk_losers"));
+        low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999));
+        return json({ gainers, losers, low52:low52.slice(0,8) });
+      } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
     }
 
     if (url.pathname === "/api/stock") {
