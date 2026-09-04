@@ -47,6 +47,6 @@ async function showSummaryQuote(symbol){
   setSummary("longTerm",total>=70?"ACCUMULATE":total>=50?"WATCH":"WAIT");setSummary("shortTerm",total>=70?"BUY SETUP":total>=50?"WAIT":"AVOID");
  }catch(e){alert("Summary load nahi ho paaya.\n\n"+e.message);}
 }
-function quickSelectSummary(symbol){showSummaryQuote(symbol);}
+function quickSelectSummary(symbol){return showSummaryQuote(symbol);}
 window.showSummaryQuote=showSummaryQuote;window.quickSelectSummary=quickSelectSummary;window.quickSelectStock=quickSelectSummary;
 document.addEventListener("DOMContentLoaded",()=>{const input=document.getElementById("stockInput");if(input){input.addEventListener("input",showSummarySuggestions);input.addEventListener("keydown",handleSummarySearch);}document.addEventListener("click",e=>{const w=document.querySelector(".search-wrapper"),b=document.getElementById("stockSuggestions");if(w&&!w.contains(e.target)&&b)b.style.display="none";});showSummaryQuote("RELIANCE");});
