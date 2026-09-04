@@ -168,7 +168,6 @@
     display: flex;
     flex-direction: column;
     row-gap: 6px;
-	text-align: end;
 }
 
 .ssname-wrap .mystuckprice {
