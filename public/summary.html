@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Summary • Stock Heaven</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="summary.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+<div class="side-stocks">
+
+    <div class="side-stocks-title">
+        <i class="fa-solid fa-chart-simple"></i>
+        <span>Popular Stocks</span>
+    </div>
+
+    <div class="side-stock-list">
+
+        <button class="side-stock" onclick="showSummaryQuote('TATAGOLD')">
+            <span class="side-stock-name">TATAGOLD</span>
+            <span class="side-stock-symbol">TATAGOLD ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('TATSILV.NS')">
+            <span class="side-stock-name">TATASILV</span>
+            <span class="side-stock-symbol">Tata Silver ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('ENERGY.NS')">
+            <span class="side-stock-name">Mirae Asset Nifty Energy</span>
+            <span class="side-stock-symbol">Mirae Energy ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('CPSEETF')">
+            <span class="side-stock-name">CPSE</span>
+            <span class="side-stock-symbol">CPSE ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('NIFTYCASE.NS')">
+            <span class="side-stock-name">Nifty 50</span>
+            <span class="side-stock-symbol">Zerodha Nifty 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('FMCGIETF.NS')">
+            <span class="side-stock-name">ICICI FMCG</span>
+            <span class="side-stock-symbol">FMCG ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('MIDCAPIETF.NS')">
+            <span class="side-stock-name">Midcap 150</span>
+            <span class="side-stock-symbol">ICICI Prudential Midcap 150</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('NEXT50IETF.NS')">
+            <span class="side-stock-name">Nifty Next 50</span>
+            <span class="side-stock-symbol">ICICI Prudential Nifty Next 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('ALPHA.NS')">
+            <span class="side-stock-name">Alpha 50</span>
+            <span class="side-stock-symbol">Kotak Nifty Alpha 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('ITBEES')">
+            <span class="side-stock-name">IT BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Nifty IT BeES</span>
+        </button>        
+
+        <button class="side-stock" onclick="showSummaryQuote('HDFCNIFBAN.NS')">
+            <span class="side-stock-name">Nifty Bank</span>
+            <span class="side-stock-symbol">HDFC Nifty Bank ETF</span>
+        </button>     
+
+        <button class="side-stock" onclick="showSummaryQuote('SMALLCAP.NS')">
+            <span class="side-stock-name">Smallcap</span>
+            <span class="side-stock-symbol">Mirae Nifty SmallC 250 Momentum Quality 100</span>
+        </button>   
+
+        <button class="side-stock" onclick="showSummaryQuote('BANKBEES')">
+            <span class="side-stock-name">Bank BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Nifty Bank BeES</span>
+        </button>  
+
+        <button class="side-stock" onclick="showSummaryQuote('GOLDBEES')">
+            <span class="side-stock-name">Gold BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Gold BeES</span>
+        </button> 
+
+        <button class="side-stock" onclick="showSummaryQuote('RELIANCE')">
+            <span class="side-stock-name">Reliance</span>
+            <span class="side-stock-symbol">RELIANCE</span>
+        </button> 
+
+        <button class="side-stock" onclick="showSummaryQuote('AWL')">
+            <span class="side-stock-name">AWL</span>
+            <span class="side-stock-symbol">Adani Wilmar Limited</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('ADANIENSOL')">
+            <span class="side-stock-name">ADANIENSOL</span>
+            <span class="side-stock-symbol">Adani Energy Solutions Limited</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('ADANIGREEN')">
+            <span class="side-stock-name">ADANIGREEN</span>
+            <span class="side-stock-symbol">Adani Green Energy Ltd</span>
+        </button>
+
+        <button class="side-stock" onclick="showSummaryQuote('NSLNISP')">
+            <span class="side-stock-name">NMDC Steel</span>
+            <span class="side-stock-symbol">NMDC Steel</span>
+        </button>        
+
+        <button class="side-stock" onclick="showSummaryQuote('TMPV')">
+            <span class="side-stock-name">TMPV</span>
+            <span class="side-stock-symbol">Tata Motors Passenger Vehicles</span>
+        </button>        
+    </div>
+
+</div>    
+
+
+<div class="page">
+<header class="top-header">
+
+    <div class="brand">
+        <div class="brand-icon">
+            <i class="fa-solid fa-chart-line"></i>
+        </div>
+
+        <div>
+            <h1>Stock Heaven</h1>
+            <p>Smart Stock Analysis</p>
+        </div>
+    </div>
+
+</header>
+
+<nav class="main-nav">
+    <div class="nav-inner">
+        <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+        <a href="summary.html" class="nav-item active"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+    </div>
+</nav>
+
+<section class="search-section">
+
+    <div class="search-wrapper">
+
+        <div class="search-box">
+
+            <i class="fa-solid fa-magnifying-glass"></i>
+
+            <input
+                type="text"
+                id="stockInput"
+                placeholder="Search stock name or symbol..."
+                autocomplete="off"
+                oninput="showStockSuggestions()"
+                onkeydown="handleSearch(event)"
+            >
+
+        </div>
+
+        <div
+            id="stockSuggestions"
+            class="stock-suggestions"
+        ></div>
+
+    </div>
+
+    <button
+        class="analyze-btn"
+        onclick="analyzeStock()"
+    >
+        <i class="fa-solid fa-chart-line"></i>
+        Analyze
+    </button>
+
+</section>
+
+<section class="summary-overview">
+  <div class="summary-stock-main">
+    <div class="summary-title">
+      <div class="summary-logo"><i class="fa-solid fa-chart-line"></i></div>
+      <div>
+        <h1 id="summarySymbol">RELIANCE</h1>
+        <div class="summary-subtitle"><span class="exchange-pill"><i class="fa-solid fa-magnifying-glass"></i> <span id="summaryExchange">NSE</span></span><span id="summaryCompany">Reliance Industries Limited</span></div>
+      </div>
+    </div>
+    <div class="summary-price-row">
+      <div class="summary-price" id="summaryPrice">₹--</div>
+      <div class="summary-change" id="summaryChange">--</div>
+    </div>
+    <small id="summaryDate">Technical summary based on available market data</small>
+  </div>
+  <div class="verdict-card" id="verdictCard">
+    <div class="verdict-label">OUR VERDICT</div>
+    <div class="verdict-main"><strong id="verdict">WATCH</strong><div class="verdict-icon"><i class="fa-solid fa-trophy"></i></div></div>
+    <p id="verdictText">Analyze a stock to generate its summary.</p>
+  </div>
+</section>
+
+<section class="summary-stats">
+  <div><span>High</span><strong id="summaryHigh">--</strong></div>
+  <div><span>Low</span><strong id="summaryLow">--</strong></div>
+  <div><span>52W High</span><strong id="summary52High">--</strong></div>
+  <div><span>52W Low</span><strong id="summary52Low">--</strong></div>
+</section>
+
+<section class="summary-card">
+  <div class="summary-section-head"><h2>ANALYSIS SUMMARY</h2><span>Based on available data</span></div>
+  <div class="score-grid">
+    <div class="score-tile"><b>Business</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Fundamental business data is not connected.</p></div>
+    <div class="score-tile"><b>Growth</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Growth history requires fundamental data.</p></div>
+    <div class="score-tile"><b>Profitability</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Profit and margin data is not connected.</p></div>
+    <div class="score-tile"><b>Debt</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Balance-sheet data is not connected.</p></div>
+    <div class="score-tile"><b>Cash Flow</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Cash-flow data is not connected.</p></div>
+    <div class="score-tile"><b>Valuation</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>PE/PB and fair-value data is not connected.</p></div>
+    <div class="score-tile"><b>Management</b><div class="score-ring muted"><span>--</span><small>/10</small></div><em>Not available</em><p>Management metrics are not connected.</p></div>
+    <div class="score-tile"><b>Technical Risk</b><div class="score-ring" id="riskRing"><span id="riskScore">--</span><small>/10</small></div><em id="riskLabel">--</em><p id="riskText">Technical risk will be calculated after analysis.</p></div>
+  </div>
+  <div class="summary-note"><i class="fa-solid fa-circle-info"></i> Fundamental fields are intentionally not estimated from price data.</div>
+</section>
+
+<section class="summary-two-col">
+  <div class="summary-card performance-card">
+    <div class="summary-section-head"><h2>FINANCIAL PERFORMANCE</h2><span>Fundamentals</span></div>
+    <div class="tabs"><span class="active">Revenue</span><span>Profit</span><span>EPS</span><span>ROE</span><span>ROCE</span></div>
+    <div class="empty-fundamental"><i class="fa-solid fa-chart-column"></i><strong>Fundamental data not available</strong><p>Revenue, profit, EPS, ROE and ROCE are not supplied by the current market-data source.</p></div>
+  </div>
+  <div class="summary-card valuation-card">
+    <div class="summary-section-head"><h2>VALUATION ANALYSIS</h2><span>Fundamentals</span></div>
+    <div class="valuation-list">
+      <div><span>Current PE</span><strong>--</strong></div><div><span>Industry PE</span><strong>--</strong></div><div><span>5Y Average PE</span><strong>--</strong></div><div><span>PEG Ratio</span><strong>--</strong></div>
+    </div>
+    <div class="valuation-message"><strong>Not available</strong><p>Valuation cannot be calculated reliably from OHLCV data alone.</p></div>
+  </div>
+</section>
+
+<section class="summary-two-col">
+  <div class="summary-card competitor-card">
+    <div class="summary-section-head"><h2>COMPETITOR COMPARISON</h2><span>Fundamentals</span></div>
+    <div class="empty-fundamental compact"><i class="fa-solid fa-table"></i><strong>Competitor fundamentals not connected</strong><p>Peer revenue growth, ROE, debt/equity and PE require additional data sources.</p></div>
+  </div>
+  <div class="summary-card technical-card">
+    <div class="summary-section-head"><h2>TECHNICAL SUMMARY</h2><span>Live analysis</span></div>
+    <div class="technical-grid">
+      <div><span>Trend</span><strong id="techTrend">--</strong></div><div><span>Price vs 20 DMA</span><strong id="tech20">--</strong></div>
+      <div><span>Price vs 50 DMA</span><strong id="tech50">--</strong></div><div><span>Price vs 200 DMA</span><strong id="tech200">--</strong></div>
+      <div><span>RSI (14)</span><strong id="techRSI">--</strong></div><div><span>Volume</span><strong id="techVolume">--</strong></div>
+      <div><span>Support</span><strong id="techSupport">--</strong></div><div><span>Resistance</span><strong id="techResistance">--</strong></div>
+    </div>
+    <div class="range-wrap"><span>52 Week Range</span><div class="range-bar"><i id="rangeFill"></i></div><div><small id="rangeLow">--</small><small id="rangeHigh">--</small></div></div>
+  </div>
+</section>
+
+<section class="insight-panels">
+  <div class="summary-card insight-panel buy"><h3>WHY BUY?</h3><ul id="whyBuy"><li>Analyze the stock to generate technical reasons.</li></ul></div>
+  <div class="summary-card insight-panel avoid"><h3>WHY NOT BUY?</h3><ul id="whyNot"><li>Risk factors will appear after analysis.</li></ul></div>
+  <div class="summary-card insight-panel risks"><h3>TOP RISKS</h3><ul id="topRisks"><li>Market and technical risk should be monitored.</li></ul></div>
+  <div class="summary-card insight-panel drivers"><h3>FUTURE GROWTH DRIVERS</h3><ul><li>Business growth data not connected.</li><li>Industry and earnings catalysts require fundamental/news data.</li><li>Track future price and volume momentum.</li></ul></div>
+</section>
+
+<section class="summary-two-col bottom-summary">
+  <div class="summary-card fair-value"><div class="summary-section-head"><h2>FAIR VALUE & TARGET PRICE</h2><span>Fundamentals</span></div><div class="fair-grid"><div><span>Estimated Fair Value</span><strong>--</strong></div><div><span>Upside / Downside</span><strong>--</strong></div></div><div class="not-available-badge">Not available</div><p>Fair value needs earnings, valuation multiples and business fundamentals.</p></div>
+  <div class="summary-card investor-card"><div class="summary-section-head"><h2>SUITABLE FOR WHICH INVESTOR?</h2></div><div class="investor-grid"><div><b>Long Term Investor</b><strong id="longTerm">WATCH</strong><p>Use fundamentals before investing.</p></div><div><b>Short Term Trader</b><strong id="shortTerm">WATCH</strong><p>Technical setup determines timing.</p></div><div><b>Value Investor</b><strong>WAIT</strong><p>Valuation data is unavailable.</p></div><div><b>Conservative Investor</b><strong>WATCHLIST</strong><p>Wait for complete fundamentals.</p></div></div></div>
+</section>
+
+<footer><p>Stock Heaven • Summary based on available market data</p></footer>
+</div>
+<script src="summary.js"></script>
+</body>
+</html>
