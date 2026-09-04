@@ -61,8 +61,9 @@ function showStuckSuggestions() {
         return;
     }
 
-    const matches = stuckStocks.filter(([symbol, name]) =>
-        symbol.toUpperCase().includes(query) || name.toUpperCase().includes(query)
+    const matches = stuckStocks.filter(stock =>
+        stock.symbol.toUpperCase().includes(query) ||
+        stock.name.toUpperCase().includes(query)
     ).slice(0, 8);
 
     if (!matches.length) {
@@ -71,9 +72,9 @@ function showStuckSuggestions() {
         return;
     }
 
-    box.innerHTML = matches.map(([symbol, name]) => `
-        <button class="stock-suggestion-item" onclick="selectStuckStock('${symbol.replace(/'/g, "\\'")}')">
-            <span><strong>${displaySymbol(symbol)}</strong><small>${name}</small></span>
+    box.innerHTML = matches.map(stock => `
+        <button class="stock-suggestion-item" onclick="selectStuckStock('${stock.symbol.replace(/'/g, "\\'")}')">
+            <span><strong>${displaySymbol(stock.symbol)}</strong><small>${stock.name}</small></span>
         </button>
     `).join("");
     box.style.display = "block";
@@ -126,8 +127,12 @@ async function showStuckQuote(symbol) {
         const result = await response.json();
         if (!response.ok || result.error) throw new Error(result.error || "Stock not found");
 
-        const found = stuckStocks.find(([s]) => cleanSymbol(s) === normalized);
-        document.getElementById("stuckCompany").textContent = found ? found[1] : normalized;
+        const found = stuckStocks.find(
+            stock => cleanSymbol(stock.symbol) === normalized
+        );
+
+        document.getElementById("stuckCompany").textContent =
+            found ? found.name : normalized;
         document.getElementById("stuckPrice").textContent = formatStuckPrice(result.price);
         document.getElementById("stuckHigh").textContent = formatStuckPrice(result.day_high);
         document.getElementById("stuckLow").textContent = formatStuckPrice(result.day_low);
@@ -175,9 +180,14 @@ async function loadStuckStocks() {
 
     container.innerHTML = `<div class="stuck-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading prices...</div>`;
 
-    const results = await Promise.all(stuckStocks.slice(0, 20).map(async ([symbol, name]) => ({
-        symbol, name, price: await getStuckStockPrice(symbol)
-    })));
+    const results = await Promise.all(
+        stuckStocks.slice(0, 20).map(async stock => ({
+            symbol: stock.symbol,
+            name: stock.name,
+            stuckInfo: stock.stuckInfo,
+            price: await getStuckStockPrice(stock.symbol)
+        }))
+    );
 
     container.innerHTML = results.map(stock => `
         <button class="stuck-stock-row" onclick="showStuckQuote('${stock.symbol.replace(/'/g, "\\'")}')">
