@@ -116,14 +116,18 @@ async function renderPeerComparison(selectedSymbol){
   if(!body) return;
 
   body.innerHTML=`<tr><td colspan="4" class="peer-loading">Finding competitors...</td></tr>`;
-  const peerResult=await fetchDynamicPeers(selectedSymbol);
-  const competitors=Array.isArray(peerResult?.peers)?peerResult.peers.slice(0,10):[];
 
-  // Keep the selected stock at the top, followed by its competitors.
-  const selectedData=await getPeerData(selectedSymbol);
-  const selectedName=peerResult?.name || selectedSymbol.replace(/\.NS$/i,"").toUpperCase();
+  // IMPORTANT: keep the existing dynamic competitor list exactly as it is,
+  // and only add the currently selected stock as the first row.
+  const [competitors, selectedData] = await Promise.all([
+    fetchDynamicPeers(selectedSymbol),
+    getPeerData(selectedSymbol)
+  ]);
+
+  const selectedClean=cleanSummarySymbol(selectedSymbol);
+  const selectedName=(document.getElementById("summaryCompany")?.textContent||selectedClean.replace(/\.NS$/i,""));
   const selectedRow={
-    symbol:selectedSymbol,
+    symbol:selectedClean,
     name:selectedName,
     ltp:selectedData?.price ?? null,
     pe:null,
@@ -131,51 +135,43 @@ async function renderPeerComparison(selectedSymbol){
     selected:true
   };
 
-  const rows=[selectedRow,...competitors.filter(p=>{
-    const a=String(p.symbol||"").replace(/\.NS$/i,"").toUpperCase();
-    const b=String(selectedSymbol||"").replace(/\.NS$/i,"").toUpperCase();
-    return a && a!==b;
-  })];
+  // Remove selected stock from competitors if the peer source already returned it.
+  const filteredCompetitors=competitors.filter(p=>
+    cleanSummarySymbol(p.symbol||"")!==selectedClean &&
+    String(p.name||"").trim().toLowerCase()!==String(selectedName).trim().toLowerCase()
+  );
 
-  if(rows.length===1 && selectedData?.price==null){
+  const rows=[selectedRow,...filteredCompetitors.slice(0,10)];
+
+  if(!rows.length){
     body.innerHTML=`<tr><td colspan="4" class="peer-loading">No peer data available for this stock.</td></tr>`;
     return;
   }
 
-  body.innerHTML=rows.map(p=>{
-    const symbol=String(p.symbol||"");
-    const isSelected=!!p.selected;
-    const rsiValue=p.rsi!=null && Number.isFinite(Number(p.rsi)) ? Number(p.rsi).toFixed(2) : "--";
-    const ltpValue=p.ltp!=null && Number.isFinite(Number(p.ltp)) ? formatSummaryPrice(p.ltp) : "--";
-    return `
-    <tr class="${isSelected?"peer-selected":""}">
+  body.innerHTML=rows.map(p=>`
+    <tr class="${p.selected?"selected-peer-row":""}">
       <td>
         <div class="peer-name">
-          <span class="peer-logo">${escapeHtml(String(symbol||p.name||"?").replace(/\.NS$/i,"").slice(0,1))}</span>
-          <span>${escapeHtml(p.name||symbol)}${isSelected?` <strong class="peer-you">(Selected)</strong>`:""}</span>
+          <span class="peer-logo">${escapeHtml(String(p.symbol||p.name||"?").replace(/\.NS$/i,"").slice(0,1))}</span>
+          <span>${escapeHtml(p.name||p.symbol)}${p.selected?` <small style="opacity:.65;font-weight:600;">(Selected)</small>`:""}</span>
         </div>
       </td>
-      <td>${ltpValue}</td>
+      <td data-peer-price="${escapeHtml(p.symbol)}">${p.ltp!=null?formatSummaryPrice(p.ltp):"--"}</td>
       <td>${p.pe!=null && Number.isFinite(Number(p.pe))?Number(p.pe).toFixed(2):"--"}</td>
-      <td>${rsiValue}</td>
-    </tr>`;
-  }).join("");
+      <td data-peer-rsi="${escapeHtml(p.symbol)}">${p.rsi!=null && Number.isFinite(Number(p.rsi))?Number(p.rsi).toFixed(2):"--"}</td>
+    </tr>`).join("");
 
-  // Some peer sources do not provide LTP/RSI. Fill only missing competitor values
-  // from the same Yahoo market-data feed used by the main Summary page.
-  const missing=competitors.filter(p=>p.ltp==null || p.rsi==null);
-  if(missing.length){
-    const results=await Promise.all(missing.map(async p=>[p,await getPeerData(p.symbol)]));
-    const currentRows=[...body.querySelectorAll("tr")];
-    results.forEach(([p,data])=>{
-      if(!data) return;
-      const row=currentRows.find(r=>r.textContent.includes(String(p.name||p.symbol)));
-      if(!row) return;
-      const cells=row.querySelectorAll("td");
-      if(p.ltp==null && data.price!=null) cells[1].textContent=formatSummaryPrice(data.price);
-      if(p.rsi==null && data.rsi!=null) cells[3].textContent=data.rsi.toFixed(2);
-    });
-  }
+  // Only fetch market data for competitors whose peer source did not already
+  // provide RSI. This preserves the old competitor list and fills RSI reliably.
+  const needData=filteredCompetitors.filter(p=>p.rsi==null || p.ltp==null);
+  const results=await Promise.all(needData.map(async p=>[p,await getPeerData(p.symbol)]));
+  results.forEach(([peer,data])=>{
+    const safe=CSS.escape(peer.symbol);
+    const rsiEl=document.querySelector(`[data-peer-rsi="${safe}"]`);
+    if(rsiEl && peer.rsi==null) rsiEl.textContent=data?.rsi!=null?data.rsi.toFixed(2):"--";
+    const priceEl=document.querySelector(`[data-peer-price="${safe}"]`);
+    if(priceEl && priceEl.textContent==="--" && data?.price!=null) priceEl.textContent=formatSummaryPrice(data.price);
+  });
 }
 
 async function showSummaryQuote(symbol){
