@@ -1,8 +1,8 @@
 const summaryStockList = [
     ["RELIANCE", "Reliance Industries Limited"], ["TCS", "Tata Consultancy Services Limited"], ["HDFCBANK", "HDFC Bank Limited"], ["INFY", "Infosys Limited"], ["ICICIBANK", "ICICI Bank Limited"], ["SBIN", "State Bank of India"], ["ITC", "ITC Limited"], ["BHARTIARTL", "Bharti Airtel Limited"],
-    ["TATAGOLD", "Tata Gold Exchange Traded Fund"], ["TATASILV.NS", "Tata Silver Exchange Traded Fund"], ["ENERGY.NS", "Mirae Asset Nifty Energy ETF"], ["CPSEETF", "CPSE Exchange Traded Fund"], ["NIFTYCASE.NS", "Zerodha Nifty 50 ETF"], ["FMCGIETF.NS", "ICICI Prudential Nifty FMCG ETF"], ["MIDCAPIETF.NS", "ICICI Prudential Nifty Midcap 150 ETF"], ["NEXT50IETF.NS", "ICICI Prudential Nifty Next 50 ETF"], ["KOTAKALPHA.NS", "Kotak Nifty Alpha 50 ETF"], ["ITBEES", "Nippon India ETF Nifty IT BeES"], ["HDFCNIFBAN.NS", "HDFC Nifty Bank ETF"], ["SMALLCAP.NS", "Mirae Asset Nifty Smallcap 250 Momentum Quality 100 ETF"], ["BANKBEES", "Nippon India ETF Nifty Bank BeES"], ["GOLDBEES", "Nippon India ETF Gold BeES"],
-    ["RELIANCE", "Reliance Industries Limited"], ["AWL", "Adani Wilmar Limited"], ["ADANIENSOL", "Adani Energy Solutions Limited"], ["ADANIGREEN", "Adani Green Energy Limited"], ["NSLNISP", "NMDC Steel"], ["TMPV", "Tata Motors Passenger Vehicles"]
+    ["TATAGOLD", "Tata Gold Exchange Traded Fund"], ["TATASILV.NS", "Tata Silver Exchange Traded Fund"], ["ENERGY.NS", "Mirae Asset Nifty Energy ETF"], ["CPSEETF", "CPSE Exchange Traded Fund"], ["NIFTYCASE.NS", "Zerodha Nifty 50 ETF"], ["FMCGIETF.NS", "ICICI Prudential Nifty FMCG ETF"], ["MIDCAPIETF.NS", "ICICI Prudential Nifty Midcap 150 ETF"], ["NEXT50IETF.NS", "ICICI Prudential Nifty Next 50 ETF"], ["KOTAKALPHA.NS", "Kotak Nifty Alpha 50 ETF"], ["ITBEES", "Nippon India ETF Nifty IT BeES"], ["HDFCNIFBAN.NS", "HDFC Nifty Bank ETF"], ["SMALLCAP.NS", "Mirae Asset Nifty Smallcap 250 Momentum Quality 100 ETF"], ["BANKBEES", "Nippon India ETF Nifty Bank BeES"], ["GOLDBEES", "Nippon India ETF Gold BeES"]
 ];
+
 function cleanSummarySymbol(s){return (s||"").trim().toUpperCase();}
 function formatSummaryPrice(v){return v==null||Number.isNaN(Number(v))?"--":`₹${Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;}
 function formatNum(v,d=2){return v==null||!Number.isFinite(Number(v))?"--":Number(v).toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d});}
@@ -15,114 +15,44 @@ function rsi14(a){if(!a||a.length<15)return null;let gains=0,losses=0;for(let i=
 function fmtPct(v){return v==null?"--":`${v>=0?"+":""}${v.toFixed(2)}%`;}
 function fmtVol(v){if(v==null)return "--";if(v>=1e7)return `${(v/1e7).toFixed(2)} Cr`;if(v>=1e5)return `${(v/1e5).toFixed(2)} L`;if(v>=1e3)return `${(v/1e3).toFixed(1)}K`;return Math.round(v).toLocaleString("en-IN");}
 function scoreRing(id,score,label,desc){setSummary(id,score==null?"--":score);setSummary(id.replace("Score","Label"),label||"--");setSummary(id.replace("Score","Desc"),desc||"");const ring=document.getElementById(id.replace("Score","Ring"));if(ring){ring.classList.toggle("muted",score==null);ring.style.setProperty("--score",score==null?0:score*10);}}
-function showSummarySuggestions(){const input=document.getElementById("stockInput"),box=document.getElementById("stockSuggestions");if(!input||!box)return;const q=input.value.trim().toUpperCase();if(!q){box.style.display="none";box.innerHTML="";return;}const matches=summaryStockList.filter(s=>s[0].toUpperCase().includes(q)||s[1].toUpperCase().includes(q)).slice(0,7);box.innerHTML=matches.map(s=>`<div class="stock-suggestion" onclick="showSummaryQuote('${s[0].replace(/'/g,"\\'")}')"><div class="suggestion-icon"><i class="fa-solid fa-chart-line"></i></div><div class="suggestion-info"><span class="suggestion-name">${s[1]}</span><span class="suggestion-symbol">NSE · <strong>${s[0]}</strong></span></div></div>`).join("");box.style.display=matches.length?"block":"none";}
+let summarySearchTimer=null;
+async function showSummarySuggestions(){
+  const input=document.getElementById("stockInput"),box=document.getElementById("stockSuggestions");
+  if(!input||!box)return;
+  const q=input.value.trim();
+  if(!q){box.style.display="none";box.innerHTML="";return;}
+  clearTimeout(summarySearchTimer);
+  summarySearchTimer=setTimeout(async()=>{
+    let matches=summaryStockList.filter(s=>s[0].toUpperCase().includes(q.toUpperCase())||s[1].toUpperCase().includes(q.toUpperCase())).map(s=>({symbol:s[0],name:s[1]}));
+    try{
+      const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const d=await r.json();
+      if(Array.isArray(d.results)) matches=[...d.results,...matches];
+    }catch(e){}
+    const seen=new Set();
+    matches=matches.filter(s=>{const k=s.symbol.toUpperCase().replace(/\.NS$/,'');if(seen.has(k))return false;seen.add(k);return true;}).slice(0,10);
+    box.innerHTML=matches.map(s=>`<div class="stock-suggestion" onclick="showSummaryQuote('${String(s.symbol).replace(/'/g,"\\'")}')"><div class="suggestion-icon"><i class="fa-solid fa-chart-line"></i></div><div class="suggestion-info"><span class="suggestion-name">${s.name}</span><span class="suggestion-symbol">NSE · <strong>${s.symbol}</strong></span></div></div>`).join("");
+    box.style.display=matches.length?"block":"none";
+  },220);
+}
+
 function handleSummarySearch(e){if(e.key==="Enter")showSummaryQuote(document.getElementById("stockInput").value);}
-const peerMap = {
-  RELIANCE: [
-    ["ONGC", "Oil & Natural Gas Corporation", 6.82],
-    ["IOC", "Indian Oil Corporation", 5.61],
-    ["BPCL", "Bharat Petroleum Corporation", 7.97],
-    ["HINDPETRO", "Hindustan Petroleum Corporation", 45.71]
-  ],
-  TCS: [
-    ["INFY", "Infosys Limited", 24.0],
-    ["HCLTECH", "HCL Technologies", 24.0],
-    ["WIPRO", "Wipro Limited", 22.0],
-    ["TECHM", "Tech Mahindra", 28.0]
-  ],
-  INFY: [
-    ["TCS", "Tata Consultancy Services", 24.0],
-    ["HCLTECH", "HCL Technologies", 24.0],
-    ["WIPRO", "Wipro Limited", 22.0],
-    ["TECHM", "Tech Mahindra", 28.0]
-  ],
-  HDFCBANK: [
-    ["ICICIBANK", "ICICI Bank", 18.5],
-    ["SBIN", "State Bank of India", 9.5],
-    ["AXISBANK", "Axis Bank", 16.5],
-    ["KOTAKBANK", "Kotak Mahindra Bank", 17.5]
-  ],
-  ICICIBANK: [
-    ["HDFCBANK", "HDFC Bank", 19.0],
-    ["SBIN", "State Bank of India", 9.5],
-    ["AXISBANK", "Axis Bank", 16.5],
-    ["KOTAKBANK", "Kotak Mahindra Bank", 17.5]
-  ],
-  SBIN: [
-    ["HDFCBANK", "HDFC Bank", 19.0],
-    ["ICICIBANK", "ICICI Bank", 18.5],
-    ["AXISBANK", "Axis Bank", 16.5],
-    ["KOTAKBANK", "Kotak Mahindra Bank", 17.5]
-  ],
-  ITC: [
-    ["HINDUNILVR", "Hindustan Unilever", 31.3],
-    ["NESTLEIND", "Nestle India", 62.0],
-    ["BRITANNIA", "Britannia Industries", 47.0],
-    ["GODREJCP", "Godrej Consumer Products", 48.4]
-  ],
-  BHARTIARTL: [
-    ["INDUSTOWER", "Indus Towers", 15.0],
-    ["IDEA", "Vodafone Idea", 0],
-    ["TATACOMM", "Tata Communications", 22.0],
-    ["RCOM", "Reliance Communications", 0]
-  ],
-  AWL: [
-    ["DABUR", "Dabur India", 34.55],
-    ["GODREJCP", "Godrej Consumer Products", 48.4],
-    ["EMAMILTD", "Emami", 22.0],
-    ["MARICO", "Marico", 57.5]
-  ],
-  ADANIGREEN: [
-    ["TATAPOWER", "Tata Power", 28.0],
-    ["NTPC", "NTPC", 14.0],
-    ["POWERGRID", "Power Grid Corporation", 17.0],
-    ["JSWENERGY", "JSW Energy", 45.0]
-  ]
-};
-
-const defaultPeers = [
-  ["ONGC", "Oil & Natural Gas Corporation", 6.82],
-  ["IOC", "Indian Oil Corporation", 5.61],
-  ["BPCL", "Bharat Petroleum Corporation", 7.97],
-  ["HINDPETRO", "Hindustan Petroleum Corporation", 45.71]
-];
-
-function peerRsi14(a){
-  if(!a || a.length < 15) return null;
-  let gains=0,losses=0;
-  for(let i=a.length-14;i<a.length;i++){
-    const d=Number(a[i])-Number(a[i-1]);
-    if(d>0) gains+=d; else losses-=d;
-  }
-  const ag=gains/14, al=losses/14;
-  if(al===0) return 100;
-  return 100-(100/(1+ag/al));
-}
-
-async function getPeerData(symbol){
-  try{
-    const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
-    const d=await r.json();
-    if(!r.ok || d.error) return null;
-    const closes=(d.history||[]).map(x=>Number(x.close)).filter(Number.isFinite);
-    return {price:Number(d.price), rsi:peerRsi14(closes)};
-  }catch(e){ return null; }
-}
-
 async function renderPeerComparison(selectedSymbol){
   const body=document.getElementById("peerTableBody");
   if(!body) return;
-  const key=cleanSummarySymbol(selectedSymbol).replace(/\.NS$/i,"");
-  const peers=peerMap[key] || defaultPeers;
-  body.innerHTML=peers.map(p=>`<tr><td><div class="peer-name"><span class="peer-logo">${p[0].slice(0,1)}</span><span>${p[1]}</span></div></td><td data-peer-price="${p[0]}">--</td><td>${p[2] > 0 ? p[2].toFixed(2) : "--"}</td><td data-peer-rsi="${p[0]}">--</td></tr>`).join("");
-
-  const results=await Promise.all(peers.map(async p=>[p[0], await getPeerData(p[0])]));
-  results.forEach(([symbol,data])=>{
-    const priceEl=document.querySelector(`[data-peer-price="${symbol}"]`);
-    const rsiEl=document.querySelector(`[data-peer-rsi="${symbol}"]`);
-    if(priceEl) priceEl.textContent=data?.price!=null?formatSummaryPrice(data.price):"--";
-    if(rsiEl) rsiEl.textContent=data?.rsi!=null?data.rsi.toFixed(2):"--";
-  });
+  body.innerHTML='<tr><td colspan="4" class="peer-loading">Finding competitors...</td></tr>';
+  try{
+    const r=await fetch(`/api/peers?symbol=${encodeURIComponent(selectedSymbol)}`);
+    const d=await r.json();
+    const peers=Array.isArray(d.peers)?d.peers.slice(0,10):[];
+    if(!peers.length){
+      body.innerHTML='<tr><td colspan="4" class="peer-loading">Peer data not available for this stock.</td></tr>';
+      return;
+    }
+    body.innerHTML=peers.map(p=>`<tr><td><div class="peer-name"><span class="peer-logo">${(p.symbol||'?').slice(0,1)}</span><span>${p.name||p.symbol}</span></div></td><td>${p.ltp!=null?formatSummaryPrice(p.ltp):"--"}</td><td>${p.pe!=null&&Number(p.pe)>0?Number(p.pe).toFixed(2):"--"}</td><td>${p.rsi!=null?Number(p.rsi).toFixed(2):"--"}</td></tr>`).join("");
+  }catch(e){
+    body.innerHTML='<tr><td colspan="4" class="peer-loading">Unable to load peer comparison.</td></tr>';
+  }
 }
 
 async function showSummaryQuote(symbol){
