@@ -176,6 +176,11 @@
     font-weight: 600;
 }
 
+.dnone
+{
+	display:none;
+}
+
 @media (max-width: 900px) {
     .stuck-quote-grid {
         grid-template-columns: repeat(2, 1fr);

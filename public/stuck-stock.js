@@ -10,11 +10,6 @@ const stuckStocks = [
         stuckInfo: "33 × 2788.12"
     },
     {
-        symbol: "FMCGIETF.NS",
-        name: "ICICI Pru Nifty FMCG ETF",
-        stuckInfo: "550 × 56.07"
-    },
-    {
         symbol: "AWL",
         name: "Adani Wilmar Limited",
         stuckInfo: "36 × 683.35"
@@ -23,6 +18,11 @@ const stuckStocks = [
         symbol: "ADANIGREEN",
         name: "Adani Green Energy",
         stuckInfo: "9 × 2333.43"
+    },	
+    {
+        symbol: "FMCGIETF.NS",
+        name: "ICICI Pru Nifty FMCG ETF",
+        stuckInfo: "550 × 56.07"
     },
     {
         symbol: "TMPV",
@@ -191,8 +191,8 @@ async function loadStuckStocks() {
 
     container.innerHTML = results.map(stock => `
         <button class="stuck-stock-row" onclick="showStuckQuote('${stock.symbol.replace(/'/g, "\\'")}')">
-            <div class="ssname-wrap"><span class="stuck-stock-name">${stock.name}</span><span class="mystuckprice">${stock.stuckInfo}</span></div>
-            <span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span>
+            <div class="ssname-wrap"><span class="stuck-stock-name">${stock.name}</span><span class="mystuckprice dnone">${stock.stuckInfo}</span></div>
+            <div class="ssname-wrap"><span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span><span class="mystuckprice">${stock.stuckInfo}</span></div>
         </button>
     `).join("");
 
