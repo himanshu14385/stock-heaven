@@ -116,37 +116,66 @@ async function renderPeerComparison(selectedSymbol){
   if(!body) return;
 
   body.innerHTML=`<tr><td colspan="4" class="peer-loading">Finding competitors...</td></tr>`;
-  const peers=await fetchDynamicPeers(selectedSymbol);
+  const peerResult=await fetchDynamicPeers(selectedSymbol);
+  const competitors=Array.isArray(peerResult?.peers)?peerResult.peers.slice(0,10):[];
 
-  if(!peers.length){
+  // Keep the selected stock at the top, followed by its competitors.
+  const selectedData=await getPeerData(selectedSymbol);
+  const selectedName=peerResult?.name || selectedSymbol.replace(/\.NS$/i,"").toUpperCase();
+  const selectedRow={
+    symbol:selectedSymbol,
+    name:selectedName,
+    ltp:selectedData?.price ?? null,
+    pe:null,
+    rsi:selectedData?.rsi ?? null,
+    selected:true
+  };
+
+  const rows=[selectedRow,...competitors.filter(p=>{
+    const a=String(p.symbol||"").replace(/\.NS$/i,"").toUpperCase();
+    const b=String(selectedSymbol||"").replace(/\.NS$/i,"").toUpperCase();
+    return a && a!==b;
+  })];
+
+  if(rows.length===1 && selectedData?.price==null){
     body.innerHTML=`<tr><td colspan="4" class="peer-loading">No peer data available for this stock.</td></tr>`;
     return;
   }
 
-  body.innerHTML=peers.map(p=>`
-    <tr>
+  body.innerHTML=rows.map(p=>{
+    const symbol=String(p.symbol||"");
+    const isSelected=!!p.selected;
+    const rsiValue=p.rsi!=null && Number.isFinite(Number(p.rsi)) ? Number(p.rsi).toFixed(2) : "--";
+    const ltpValue=p.ltp!=null && Number.isFinite(Number(p.ltp)) ? formatSummaryPrice(p.ltp) : "--";
+    return `
+    <tr class="${isSelected?"peer-selected":""}">
       <td>
         <div class="peer-name">
-          <span class="peer-logo">${escapeHtml(String(p.symbol||p.name||"?").slice(0,1))}</span>
-          <span>${escapeHtml(p.name||p.symbol)}</span>
+          <span class="peer-logo">${escapeHtml(String(symbol||p.name||"?").replace(/\.NS$/i,"").slice(0,1))}</span>
+          <span>${escapeHtml(p.name||symbol)}${isSelected?` <strong class="peer-you">(Selected)</strong>`:""}</span>
         </div>
       </td>
-      <td data-peer-price="${escapeHtml(p.symbol)}">${p.ltp!=null?formatSummaryPrice(p.ltp):"--"}</td>
-      <td>${p.pe!=null?Number(p.pe).toFixed(2):"--"}</td>
-      <td data-peer-rsi="${escapeHtml(p.symbol)}">--</td>
-    </tr>`).join("");
+      <td>${ltpValue}</td>
+      <td>${p.pe!=null && Number.isFinite(Number(p.pe))?Number(p.pe).toFixed(2):"--"}</td>
+      <td>${rsiValue}</td>
+    </tr>`;
+  }).join("");
 
-  // LTP and P/E come from the dynamic peer source; RSI is calculated from the same
-  // market-data feed used by the main Summary page.
-  const results=await Promise.all(peers.map(async p=>[p.symbol,await getPeerData(p.symbol)]));
-  results.forEach(([symbol,data])=>{
-    const safe=CSS.escape(symbol);
-    const rsiEl=document.querySelector(`[data-peer-rsi="${safe}"]`);
-    if(rsiEl) rsiEl.textContent=data?.rsi!=null?data.rsi.toFixed(2):"--";
-    // Keep peer-source LTP if it exists; use Yahoo only as a fallback.
-    const priceEl=document.querySelector(`[data-peer-price="${safe}"]`);
-    if(priceEl && priceEl.textContent==="--" && data?.price!=null) priceEl.textContent=formatSummaryPrice(data.price);
-  });
+  // Some peer sources do not provide LTP/RSI. Fill only missing competitor values
+  // from the same Yahoo market-data feed used by the main Summary page.
+  const missing=competitors.filter(p=>p.ltp==null || p.rsi==null);
+  if(missing.length){
+    const results=await Promise.all(missing.map(async p=>[p,await getPeerData(p.symbol)]));
+    const currentRows=[...body.querySelectorAll("tr")];
+    results.forEach(([p,data])=>{
+      if(!data) return;
+      const row=currentRows.find(r=>r.textContent.includes(String(p.name||p.symbol)));
+      if(!row) return;
+      const cells=row.querySelectorAll("td");
+      if(p.ltp==null && data.price!=null) cells[1].textContent=formatSummaryPrice(data.price);
+      if(p.rsi==null && data.rsi!=null) cells[3].textContent=data.rsi.toFixed(2);
+    });
+  }
 }
 
 async function showSummaryQuote(symbol){
