@@ -4,95 +4,113 @@ const defaultAlerts=[
  {symbol:"ADANIENSOL",name:"ADANIENSOL",alertPrice:""},
  {symbol:"ADANIGREEN",name:"ADANIGREEN",alertPrice:""},
  {symbol:"NSLNISP",name:"NMDC Steel",alertPrice:""},
- {symbol:"TMPV",name:"TMPV",alertPrice:""}
-];
-
-const stockRecommendations=[
- ["RELIANCE","Reliance Industries"],
- ["TCS","Tata Consultancy Services"],
- ["INFY","Infosys"],
- ["HDFCBANK","HDFC Bank"],
- ["ICICIBANK","ICICI Bank"],
- ["SBIN","State Bank of India"],
- ["ITC","ITC"],
- ["BHARTIARTL","Bharti Airtel"],
- ["AWL","Adani Wilmar"],
- ["ADANIENSOL","Adani Energy Solutions"],
- ["ADANIGREEN","Adani Green Energy"],
- ["NSLNISP","NMDC Steel"],
- ["TMPV","Tata Motors Passenger Vehicles"],
- ["TATASILV.NS","Tata Silver ETF"],
- ["ENERGY.NS","Mirae Asset Nifty Energy ETF"],
- ["NIFTYCASE.NS","Zerodha Nifty 50 ETF"],
- ["FMCGIETF.NS","ICICI Prudential Nifty FMCG ETF"],
- ["MIDCAPIETF.NS","ICICI Prudential Midcap 150 ETF"],
- ["NEXT50IETF.NS","ICICI Prudential Nifty Next 50 ETF"],
- ["KOTAKALPHA.NS","Kotak Nifty Alpha 50 ETF"],
- ["HDFCNIFBAN.NS","HDFC Nifty Bank ETF"],
- ["SMALLCAP.NS","Mirae Nifty Smallcap ETF"],
- ["BANKBEES","Nippon India ETF Nifty Bank BeES"],
- ["GOLDBEES","Nippon India ETF Gold BeES"],
- ["ITBEES","Nippon India ETF Nifty IT BeES"]
+ {symbol:"TMPV",name:"TMPV",alertPrice:""},
+ {symbol:"RELIANCE",name:"Reliance Industries",alertPrice:""},
+ {symbol:"HDFCBANK",name:"HDFC Bank",alertPrice:""},
+ {symbol:"TCS",name:"Tata Consultancy Services",alertPrice:""},
+ {symbol:"INFY",name:"Infosys",alertPrice:""},
+ {symbol:"HINDUNILVR",name:"Hindustan Unilever",alertPrice:""},
+ {symbol:"ICICIBANK",name:"ICICI Bank",alertPrice:""},
+ {symbol:"SBIN",name:"State Bank of India",alertPrice:""}
 ];
 
 function loadAlerts(){try{const x=JSON.parse(localStorage.getItem(ALERT_STORAGE_KEY));if(Array.isArray(x))return x}catch(e){}return defaultAlerts}
-let alertStocks=loadAlerts(), alertTimer;
+let alertStocks=loadAlerts(), prices={}, timer=null;
 
 function saveAlerts(){localStorage.setItem(ALERT_STORAGE_KEY,JSON.stringify(alertStocks))}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function money(v){return Number.isFinite(Number(v))?"₹"+Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"--"}
+function initials(name){return String(name||"ST").replace(/[^A-Za-z0-9 ]/g,"").split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
 
-function renderAlerts(){
- const box=document.getElementById("alertList");
- if(!alertStocks.length){box.innerHTML='<div class="alert-empty">No stocks added.</div>';return}
- box.innerHTML=alertStocks.map((s,i)=>`
- <div class="alert-row" id="alert-row-${i}">
-  <div class="alert-stock"><b>${esc(s.name||s.symbol)}</b><small>${esc(s.symbol)}</small></div>
-  <input class="alert-price-input" type="number" min="0" step="0.01" value="${esc(s.alertPrice||"")}" placeholder="Set price" oninput="setAlert(${i},this.value)">
-  <div class="alert-current" id="alert-current-${i}">--</div>
-  <button class="alert-remove" onclick="removeAlert(${i})" title="Remove"><i class="fa-solid fa-trash"></i></button>
- </div>`).join("");
+function stateOf(s){
+ const p=prices[s.symbol], target=Number(s.alertPrice);
+ if(!Number.isFinite(target))return "none";
+ if(Number.isFinite(p?.price)&&p.price<=target)return "hit";
+ return "watching";
 }
+function filtered(){
+ const q=(document.getElementById("tableSearch")?.value||"").trim().toUpperCase();
+ const f=document.getElementById("stockFilter")?.value||"all";
+ return alertStocks.filter(s=>{
+  const text=(s.symbol+" "+s.name).toUpperCase();
+  return (!q||text.includes(q))&&(f==="all"||stateOf(s)===f);
+ })
+}
+function render(){
+ const box=document.getElementById("alertRows"), list=filtered();
+ document.getElementById("totalCount").textContent=alertStocks.length;
+ document.getElementById("activeCount").textContent=alertStocks.filter(s=>stateOf(s)!=="none").length;
+ document.getElementById("hitCount").textContent=alertStocks.filter(s=>stateOf(s)==="hit").length;
+ document.getElementById("watchCount").textContent=alertStocks.filter(s=>stateOf(s)==="watching").length;
+ document.getElementById("showingText").textContent=`Showing 1 – ${list.length} of ${list.length} stocks`;
+ if(!list.length){box.innerHTML='<div class="alert-empty">No stocks match your search.</div>';return}
 
-function setAlert(i,v){alertStocks[i].alertPrice=v;saveAlerts();checkRow(i)}
-function removeAlert(i){alertStocks.splice(i,1);saveAlerts();renderAlerts();refreshPrices()}
-function openAddStock(){document.getElementById("addStockBox").classList.toggle("hidden");document.getElementById("stockSearch").focus()}
-function addStock(symbol,name){
- if(alertStocks.some(x=>x.symbol===symbol)){document.getElementById("addStockBox").classList.add("hidden");return}
- alertStocks.push({symbol,name,alertPrice:""});saveAlerts();renderAlerts();refreshPrices();
- document.getElementById("stockSearch").value="";document.getElementById("recommendations").innerHTML="";document.getElementById("addStockBox").classList.add("hidden");
+ box.innerHTML=list.map((s)=> {
+  const i=alertStocks.indexOf(s), p=prices[s.symbol], st=stateOf(s), target=Number(s.alertPrice);
+  const change=Number(p?.change), pct=Number(p?.percent_change), market=Number(p?.price);
+  const hit=st==="hit";
+  const diff=Number.isFinite(market)&&Number.isFinite(target)?market-target:null;
+  const logo=initials(s.name||s.symbol);
+  return `<div class="alert-row ${hit?"triggered":""}">
+   <div class="check-col"><input class="alert-check" type="checkbox"></div>
+   <div>${i+1}</div>
+   <div class="stock-cell"><div class="stock-logo">${esc(logo)}</div><div class="stock-meta"><b>${esc(s.name||s.symbol)}</b><small>${esc(s.symbol)}</small></div></div>
+   <div><input class="alert-input" type="number" min="0" step="0.01" placeholder="Set price" value="${esc(s.alertPrice||"")}" oninput="setAlert(${i},this.value)"></div>
+   <div class="market-cell ${Number.isFinite(change)&&change<0?"market-down":"market-up"}"><b>${money(market)}</b><small>${Number.isFinite(change)?(change>=0?"+":"")+money(Math.abs(change)).replace("₹","₹"):"--"} ${Number.isFinite(pct)?`(${pct>=0?"+":""}${pct.toFixed(2)}%)`:""}</small></div>
+   <div class="diff-cell ${hit?"diff-hit":(st==="watching"?"diff-safe":"diff-none")}"><b>${diff===null?"-":(diff>=0?"+":"-")+money(Math.abs(diff))}</b><small>${diff===null?"":target?`(${((diff/target)*100).toFixed(2)}%)`:""}</small></div>
+   <div><span class="status-pill ${hit?"hit":st==="watching"?"watch":"none"}"><i class="fa-solid ${hit?"fa-bell":st==="watching"?"fa-eye":"fa-bell"}"></i>${hit?"Price Hit":st==="watching"?"Watching":"No Alert"}</span></div>
+   <div><button class="action-delete" onclick="removeAlert(${i})" title="Remove"><i class="fa-solid fa-trash-can"></i></button></div>
+  </div>`;
+ }).join("");
 }
-function showRecommendations(q){
- const box=document.getElementById("recommendations"), term=q.trim().toUpperCase();
- if(!term){box.innerHTML="";return}
- const matches=stockRecommendations.filter(x=>(x[0]+" "+x[1]).toUpperCase().includes(term)).slice(0,8);
- box.innerHTML=matches.map(x=>`<div class="rec-item" onclick="addStock('${esc(x[0])}','${esc(x[1])}')"><span class="rec-symbol">${esc(x[0])}</span><span class="rec-name">${esc(x[1])}</span></div>`).join("");
+function setAlert(i,v){alertStocks[i].alertPrice=v;saveAlerts();render()}
+function removeAlert(i){alertStocks.splice(i,1);delete prices[alertStocks[i]?.symbol];saveAlerts();render();refreshPrices()}
+function openAddStock(){document.getElementById("addStockPanel").classList.add("open");document.getElementById("addStockInput").focus()}
+function closeAddStock(){document.getElementById("addStockPanel").classList.remove("open");document.getElementById("addStockInput").value="";document.getElementById("recommendations").innerHTML=""}
+
+function renderRecommendations(data){
+ const box=document.getElementById("recommendations");
+ if(!data.length){box.innerHTML="";return}
+ box.innerHTML=data.slice(0,8).map(x=>`<div class="recommendation" onclick="addRecommended('${esc(x.symbol)}','${esc(x.name)}')"><span class="rec-symbol">${esc(x.symbol)}</span><span class="rec-name">${esc(x.name)}</span></div>`).join("");
 }
-function checkRow(i){
- const s=alertStocks[i], el=document.getElementById("alert-current-"+i), row=document.getElementById("alert-row-"+i);
- if(!s||!el||!row)return;
- const current=Number(el.dataset.price), target=Number(s.alertPrice);
- // RED when Market Price is equal to or below My Alert Price.
- const triggered=Number.isFinite(current)&&Number.isFinite(target)&&current<=target;
- row.classList.toggle("triggered",triggered);el.classList.toggle("triggered",triggered);
+async function searchStocks(q){
+ if(!q.trim()){document.getElementById("recommendations").innerHTML="";return}
+ try{
+  const r=await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`);
+  const d=await r.json();
+  const arr=Array.isArray(d)?d:(d.results||d.data||[]);
+  const normalized=arr.map(x=>({symbol:x.symbol||x.nse_code||x.code||"",name:x.name||x.company_name||x.company||""})).filter(x=>x.symbol&&x.name);
+  renderRecommendations(normalized);
+ }catch(e){document.getElementById("recommendations").innerHTML="";}
+
+}
+function addRecommended(symbol,name){
+ if(alertStocks.some(x=>x.symbol===symbol)){closeAddStock();return}
+ alertStocks.push({symbol,name,alertPrice:""});saveAlerts();render();closeAddStock();refreshPrices();
 }
 async function getPrice(symbol){
  const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
- const d=await r.json();if(!r.ok||d.error)throw Error(d.error||"Price unavailable");return Number(d.price)
+ const d=await r.json();if(!r.ok||d.error)throw Error(d.error||"Price unavailable");
+ return {price:Number(d.price),change:Number(d.change),percent_change:Number(d.percent_change)};
 }
 async function refreshPrices(){
- await Promise.all(alertStocks.map(async(s,i)=>{
-  const el=document.getElementById("alert-current-"+i);if(!el)return;
-  try{const p=await getPrice(s.symbol);el.dataset.price=p;el.textContent=money(p);checkRow(i)}
-  catch(e){el.textContent="--";el.removeAttribute("data-price");checkRow(i)}
+ await Promise.all(alertStocks.map(async s=>{
+  try{prices[s.symbol]=await getPrice(s.symbol)}catch(e){prices[s.symbol]={}}
  }));
- const u=document.getElementById("alertUpdated");if(u)u.textContent="Updated "+new Date().toLocaleTimeString("en-IN")+" • Auto refresh 60s";
+ render();
+ const u=document.getElementById("showingText"); if(u)u.title="Prices refresh automatically every 60 seconds";
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
- renderAlerts();refreshPrices();alertTimer=setInterval(refreshPrices,60000);
- const input=document.getElementById("stockSearch");
- input.addEventListener("input",e=>showRecommendations(e.target.value));
- input.addEventListener("focus",e=>showRecommendations(e.target.value));
- document.addEventListener("click",e=>{if(!e.target.closest(".autocomplete")&&!e.target.closest(".alert-add-btn"))document.getElementById("recommendations").innerHTML=""});
+ render();refreshPrices();timer=setInterval(refreshPrices,60000);
+ document.getElementById("tableSearch").addEventListener("input",render);
+ document.getElementById("stockFilter").addEventListener("change",render);
+ document.getElementById("rowsPerPage").addEventListener("change",render);
+ const input=document.getElementById("addStockInput");
+ let searchTimer;
+ input.addEventListener("input",e=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchStocks(e.target.value),180)});
+ document.addEventListener("click",e=>{
+  if(!e.target.closest(".add-stock-panel")&&!e.target.closest(".add-stock-main"))document.getElementById("recommendations").innerHTML="";
+ });
+ document.getElementById("selectAll").addEventListener("change",e=>document.querySelectorAll(".alert-check").forEach(x=>x.checked=e.target.checked));
 });

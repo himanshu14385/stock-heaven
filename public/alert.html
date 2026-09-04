@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alert • Stock Heaven</title>
+<title>Alerts • Stock Heaven</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="alert.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -11,34 +11,77 @@
 <body>
 <div class="page">
 <header class="top-header">
-  <div class="brand"><div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div><div><h1>Stock Heaven</h1><p>Simple stock analysis</p></div></div>
-  <div class="header-right"><div class="market-badge">NSE / BSE</div><button class="theme-toggle" type="button"><i class="fa-solid fa-moon"></i></button></div>
+    <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div><h1>Stock Heaven</h1><p>Simple stock analysis</p></div>
+    </div>
+    <div class="header-right">
+        <div class="market-badge">NSE / BSE</div>
+        <button class="theme-toggle" type="button"><i class="fa-solid fa-moon"></i></button>
+    </div>
 </header>
 
 <nav class="main-nav">
-  <a href="index.html" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
-  <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-lock"></i><span>Stuck Stock</span></a>
-  <a href="summary.html" class="nav-item"><i class="fa-solid fa-chart-pie"></i><span>Summary</span></a>
-  <a href="alert.html" class="nav-item active"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+    <div class="nav-inner">
+        <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+        <a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+        <a href="alert.html" class="nav-item active"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+    </div>
 </nav>
 
-<main class="alert-page">
-<section class="alert-card">
-  <div class="alert-top">
-    <div><div class="alert-title"><i class="fa-solid fa-bell"></i> Alert</div><div class="alert-sub">Current price ≤ your alert price = <b>RED</b></div></div>
-    <button class="alert-add-btn" onclick="openAddStock()"><i class="fa-solid fa-plus"></i> Add Stock</button>
-  </div>
+<main class="alerts-main">
+<section class="alerts-shell">
+    <div class="alerts-header">
+        <div class="alerts-title-wrap">
+            <div class="alerts-bell"><i class="fa-solid fa-bell"></i></div>
+            <div>
+                <h2>Alerts</h2>
+                <p>Get notified when your stocks reach your target price</p>
+            </div>
+        </div>
 
-  <div id="addStockBox" class="add-stock-box hidden">
-    <div class="autocomplete">
-      <input id="stockSearch" autocomplete="off" placeholder="Type stock name or symbol...">
-      <div id="recommendations" class="recommendations"></div>
+        <div class="alerts-stats">
+            <div class="alert-stat stat-total"><i class="fa-solid fa-chart-column"></i><b id="totalCount">0</b><span>Total Stocks</span></div>
+            <div class="alert-stat stat-active"><i class="fa-solid fa-bell"></i><b id="activeCount">0</b><span>Active Alerts</span></div>
+            <div class="alert-stat stat-hit"><i class="fa-solid fa-bullseye"></i><b id="hitCount">0</b><span>Price Hit</span></div>
+            <div class="alert-stat stat-watch"><i class="fa-solid fa-eye"></i><b id="watchCount">0</b><span>Watching</span></div>
+        </div>
+
+        <button class="add-stock-main" type="button" onclick="openAddStock()"><i class="fa-solid fa-plus"></i> Add Stock</button>
     </div>
-  </div>
 
-  <div class="alert-head"><span>STOCK</span><span>MY ALERT</span><span>MARKET PRICE</span><span></span></div>
-  <div id="alertList"></div>
-  <div id="alertUpdated" class="alert-updated">Updating prices...</div>
+    <div class="alerts-toolbar">
+        <div class="alert-search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input id="tableSearch" type="text" placeholder="Search stocks (e.g. RELIANCE, TCS, HDFC)..."></div>
+        <select id="stockFilter"><option value="all">All Stocks</option><option value="active">Active Alerts</option><option value="hit">Price Hit</option><option value="watching">Watching</option><option value="none">No Alert</option></select>
+    </div>
+
+    <div id="addStockPanel" class="add-stock-panel">
+        <div class="add-search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="addStockInput" autocomplete="off" type="text" placeholder="Type stock name or symbol...">
+            <button type="button" onclick="closeAddStock()">Cancel</button>
+        </div>
+        <div id="recommendations" class="recommendations"></div>
+    </div>
+
+    <div class="alert-table">
+        <div class="alert-table-head">
+            <div class="check-col"><input type="checkbox" id="selectAll"></div>
+            <div>#</div>
+            <div>STOCK <i class="fa-solid fa-sort"></i></div>
+            <div>ALERT PRICE <i class="fa-solid fa-sort"></i></div>
+            <div>MARKET PRICE <i class="fa-solid fa-sort"></i></div>
+            <div>DIFFERENCE <i class="fa-solid fa-sort"></i></div>
+            <div>STATUS <i class="fa-solid fa-sort"></i></div>
+            <div>ACTIONS</div>
+        </div>
+        <div id="alertRows"></div>
+        <div class="alerts-footer">
+            <span id="showingText">Showing 0 stocks</span>
+            <div class="pagination"><span>Rows per page</span><select id="rowsPerPage"><option>25</option><option>50</option><option>100</option></select><button disabled>‹</button><button class="page-active">1</button><button disabled>›</button></div>
+        </div>
+    </div>
 </section>
 </main>
 </div>
