@@ -141,3 +141,31 @@
         font-size: 13px;
     }
 }
+
+
+/* Search result on Stuck Stock page */
+.stuck-quote {
+    margin-bottom: 20px;
+}
+
+.stuck-quote .stock-main {
+    align-items: center;
+}
+
+.stuck-quote-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.stuck-quote .price-change.negative {
+    color: #e55353;
+}
+
+.stuck-quote .stat-item {
+    align-items: center;
+}
+
+@media (max-width: 900px) {
+    .stuck-quote-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

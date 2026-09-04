@@ -17,157 +17,232 @@
 
 <body>
 
-<div class="page">
+<div class="side-stocks">
 
-    <header class="top-header">
+    <div class="side-stocks-title">
+        <i class="fa-solid fa-chart-simple"></i>
+        <span>Popular Stocks</span>
+    </div>
 
-        <div class="brand">
-            <div class="brand-icon">
-                <i class="fa-solid fa-chart-line"></i>
-            </div>
+    <div class="side-stock-list">
 
-            <div>
-                <h1>Stock Heaven</h1>
-                <p>Smart Stock Analysis</p>
-            </div>
-        </div>
-
-    </header>
-
-    <nav class="main-nav">
-
-        <div class="nav-inner">
-
-            <a href="index.html#dashboard" class="nav-item">
-                <i class="fa-solid fa-house"></i>
-                <span>Dashboard</span>
-            </a>
-
-            <a href="index.html#keypoints" class="nav-item">
-                <i class="fa-solid fa-bolt"></i>
-                <span>Key Points</span>
-            </a>
-
-            <a href="index.html#technicals" class="nav-item">
-                <i class="fa-solid fa-chart-line"></i>
-                <span>Technicals</span>
-            </a>
-
-            <a href="index.html#fundamentals" class="nav-item">
-                <i class="fa-solid fa-building"></i>
-                <span>Fundamentals</span>
-            </a>
-
-            <a href="index.html#valuation" class="nav-item">
-                <i class="fa-solid fa-scale-balanced"></i>
-                <span>Valuation</span>
-            </a>
-
-            <a href="index.html#risk" class="nav-item">
-                <i class="fa-solid fa-shield-halved"></i>
-                <span>Risk</span>
-            </a>
-
-            <a href="index.html#news" class="nav-item">
-                <i class="fa-regular fa-newspaper"></i>
-                <span>News</span>
-            </a>
-
-            <a href="stuck-stock.html" class="nav-item active">
-                <i class="fa-solid fa-thumbtack"></i>
-                <span>Stuck Stock</span>
-            </a>
-
-        </div>
-
-    </nav>
-
-    <!-- SEARCH -->
-    <section class="search-section">
-
-        <div class="search-wrapper">
-
-            <div class="search-box">
-
-                <i class="fa-solid fa-magnifying-glass"></i>
-
-                <input
-                    type="text"
-                    id="stuckSearchInput"
-                    placeholder="Search stock name or symbol..."
-                    autocomplete="off"
-                    onkeydown="handleStuckSearch(event)"
-                >
-
-            </div>
-
-        </div>
-
-        <button
-            class="analyze-btn"
-            onclick="searchFromStuckPage()"
-        >
-            <i class="fa-solid fa-chart-line"></i>
-            Analyze
+        <button class="side-stock" onclick="showStuckQuote('TATAGOLD')">
+            <span class="side-stock-name">TATAGOLD</span>
+            <span class="side-stock-symbol">TATAGOLD ETF</span>
         </button>
 
+        <button class="side-stock" onclick="showStuckQuote('TATSILV.NS')">
+            <span class="side-stock-name">TATASILV</span>
+            <span class="side-stock-symbol">Tata Silver ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('ENERGY.NS')">
+            <span class="side-stock-name">Mirae Asset Nifty Energy</span>
+            <span class="side-stock-symbol">Mirae Energy ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('CPSEETF')">
+            <span class="side-stock-name">CPSE</span>
+            <span class="side-stock-symbol">CPSE ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('NIFTYCASE.NS')">
+            <span class="side-stock-name">Nifty 50</span>
+            <span class="side-stock-symbol">Zerodha Nifty 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('FMCGIETF.NS')">
+            <span class="side-stock-name">ICICI FMCG (550 * 56.07)</span>
+            <span class="side-stock-symbol">FMCG ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('MIDCAPIETF.NS')">
+            <span class="side-stock-name">Midcap 150</span>
+            <span class="side-stock-symbol">ICICI Prudential Midcap 150</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('NEXT50IETF.NS')">
+            <span class="side-stock-name">Nifty Next 50</span>
+            <span class="side-stock-symbol">ICICI Prudential Nifty Next 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('ALPHA.NS')">
+            <span class="side-stock-name">Alpha 50</span>
+            <span class="side-stock-symbol">Kotak Nifty Alpha 50 ETF</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('ITBEES')">
+            <span class="side-stock-name">IT BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Nifty IT BeES</span>
+        </button>        
+
+        <button class="side-stock" onclick="showStuckQuote('HDFCNIFBAN.NS')">
+            <span class="side-stock-name">Nifty Bank</span>
+            <span class="side-stock-symbol">HDFC Nifty Bank ETF</span>
+        </button>     
+
+        <button class="side-stock" onclick="showStuckQuote('SMALLCAP.NS')">
+            <span class="side-stock-name">Smallcap</span>
+            <span class="side-stock-symbol">Mirae Nifty SmallC 250 Momentum Quality 100</span>
+        </button>   
+
+        <button class="side-stock" onclick="showStuckQuote('BANKBEES')">
+            <span class="side-stock-name">Bank BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Nifty Bank BeES</span>
+        </button>  
+
+        <button class="side-stock" onclick="showStuckQuote('GOLDBEES')">
+            <span class="side-stock-name">Gold BeES</span>
+            <span class="side-stock-symbol">Nippon India ETF Gold BeES</span>
+        </button> 
+
+        <button class="side-stock" onclick="showStuckQuote('RELIANCE')">
+            <span class="side-stock-name">Reliance</span>
+            <span class="side-stock-symbol">RELIANCE</span>
+        </button> 
+
+        <button class="side-stock" onclick="showStuckQuote('AWL')">
+            <span class="side-stock-name">AWL</span>
+            <span class="side-stock-symbol">Adani Wilmar Limited</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('ADANIENSOL')">
+            <span class="side-stock-name">ADANIENSOL</span>
+            <span class="side-stock-symbol">Adani Energy Solutions Limited</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('ADANIGREEN')">
+            <span class="side-stock-name">ADANIGREEN</span>
+            <span class="side-stock-symbol">Adani Green Energy Ltd</span>
+        </button>
+
+        <button class="side-stock" onclick="showStuckQuote('NSLNISP')">
+            <span class="side-stock-name">NMDC Steel (31 * 52.85)</span>
+            <span class="side-stock-symbol">NMDC Steel</span>
+        </button>        
+
+        <button class="side-stock" onclick="showStuckQuote('TMPV')">
+            <span class="side-stock-name">TMPV (27 * 508.60)</span>
+            <span class="side-stock-symbol">Tata Motors Passenger Vehicles</span>
+        </button>        
+    </div>
+
+</div>    
+
+
+
+<div class="page">
+
+<header class="top-header">
+    <div class="brand">
+        <div class="brand-icon">
+            <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div>
+            <h1>Stock Heaven</h1>
+            <p>Smart Stock Analysis</p>
+        </div>
+    </div>
+</header>
+
+<nav class="main-nav">
+    <div class="nav-inner">
+        <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="index.html#keypoints" class="nav-item"><i class="fa-solid fa-bolt"></i><span>Key Points</span></a>
+        <a href="index.html#technicals" class="nav-item"><i class="fa-solid fa-chart-line"></i><span>Technicals</span></a>
+        <a href="index.html#fundamentals" class="nav-item"><i class="fa-solid fa-building"></i><span>Fundamentals</span></a>
+        <a href="index.html#valuation" class="nav-item"><i class="fa-solid fa-scale-balanced"></i><span>Valuation</span></a>
+        <a href="index.html#risk" class="nav-item"><i class="fa-solid fa-shield-halved"></i><span>Risk</span></a>
+        <a href="index.html#news" class="nav-item"><i class="fa-regular fa-newspaper"></i><span>News</span></a>
+        <a href="stuck-stock.html" class="nav-item active"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+    </div>
+</nav>
+
+<section class="search-section">
+    <div class="search-wrapper">
+        <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input
+                type="text"
+                id="stuckSearchInput"
+                placeholder="Search stock name or symbol..."
+                autocomplete="off"
+                oninput="showStuckSuggestions()"
+                onkeydown="handleStuckSearch(event)"
+            >
+        </div>
+        <div id="stuckSuggestions" class="stock-suggestions"></div>
+    </div>
+    <button class="analyze-btn" onclick="searchFromStuckPage()">
+        <i class="fa-solid fa-chart-line"></i>
+        Analyze
+    </button>
+</section>
+
+<!-- SEARCH RESULT: ONLY THE SMALL QUOTE CARD -->
+<section id="stuckQuote" class="stock-overview stuck-quote" style="display:none;">
+    <div class="stock-main">
+        <div class="stock-title">
+            <h2 id="stuckSymbol">RELIANCE</h2>
+            <div class="stock-subtitle">
+                <span class="exchange-pill">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <span id="stuckExchange">NSE</span>
+                </span>
+                <span id="stuckCompany">Reliance Industries Limited</span>
+            </div>
+        </div>
+        <div class="price-box">
+            <div class="price" id="stuckPrice">₹--</div>
+            <div class="price-change" id="stuckChange">--</div>
+            <small>Today</small>
+        </div>
+    </div>
+    <div class="overview-grid stuck-quote-grid">
+        <div class="stat-item">
+            <div class="stat-icon green"><i class="fa-solid fa-arrow-trend-up"></i></div>
+            <div><span>High</span><strong id="stuckHigh">--</strong></div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-icon red"><i class="fa-solid fa-arrow-trend-down"></i></div>
+            <div><span>Low</span><strong id="stuckLow">--</strong></div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-icon green"><i class="fa-solid fa-bullseye"></i></div>
+            <div><span>52W High</span><strong id="stuck52High">--</strong></div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-icon red"><i class="fa-solid fa-bullseye"></i></div>
+            <div><span>52W Low</span><strong id="stuck52Low">--</strong></div>
+        </div>
+    </div>
+</section>
+
+<!-- STUCK STOCK LIST ALWAYS REMAINS ON THIS PAGE -->
+<main class="stuck-page-content">
+    <section class="card stuck-stock-card">
+        <div class="stuck-heading">
+            <div>
+                <div class="section-title">
+                    <i class="fa-solid fa-thumbtack"></i>
+                    <h2>Stuck Stock</h2>
+                </div>
+                <p class="stuck-description">Stocks and ETFs you are currently tracking.</p>
+            </div>
+            <button class="stuck-refresh" onclick="loadStuckStocks()" title="Refresh prices">
+                <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+        </div>
+        <div id="stuckStockList" class="stuck-stock-list">
+            <div class="stuck-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading prices...</div>
+        </div>
+        <div id="stuckUpdated" class="stuck-updated">Updating prices...</div>
     </section>
+</main>
 
-    <!-- STUCK STOCK ONLY -->
-    <main class="stuck-page-content">
-
-        <section class="card stuck-stock-card">
-
-            <div class="stuck-heading">
-
-                <div>
-                    <div class="section-title">
-                        <i class="fa-solid fa-thumbtack"></i>
-                        <h2>Stuck Stock</h2>
-                    </div>
-
-                    <p class="stuck-description">
-                        Stocks and ETFs you are currently tracking.
-                    </p>
-                </div>
-
-                <button
-                    class="stuck-refresh"
-                    onclick="loadStuckStocks()"
-                    title="Refresh prices"
-                >
-                    <i class="fa-solid fa-rotate"></i>
-                    Refresh
-                </button>
-
-            </div>
-
-            <div id="stuckStockList" class="stuck-stock-list">
-
-                <div class="stuck-loading">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                    Loading prices...
-                </div>
-
-            </div>
-
-            <div id="stuckUpdated" class="stuck-updated">
-                Updating prices...
-            </div>
-
-        </section>
-
-    </main>
-
-    <footer>
-        <p>
-            Stock Heaven • Stuck Stock watchlist
-        </p>
-    </footer>
+<footer><p>Stock Heaven • Stuck Stock watchlist</p></footer>
 
 </div>
-
 <script src="stuck-stock.js"></script>
-
 </body>
 </html>
