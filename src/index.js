@@ -181,22 +181,6 @@ async function fetchSelectedPE(symbol) {
     return m ? num(m[1]) : null;
   } catch (_) { return null; }
 }
-async function fetchYahooScreener(scrId) {
-  const u = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=50&scrIds=${encodeURIComponent(scrId)}&region=IN&lang=en-IN`;
-  try {
-    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*" } });
-    if (!r.ok) return [];
-    const body = await r.json();
-    return body?.finance?.result?.[0]?.quotes || [];
-  } catch (_) { return []; }
-}
-function marketQuote(q) {
-  const symbol = String(q.symbol || "").toUpperCase();
-  if (!symbol.endsWith(".NS")) return null;
-  const price = Number(q.regularMarketPrice), changePercent = Number(q.regularMarketChangePercent), low = Number(q.fiftyTwoWeekLow);
-  return { symbol:symbol.replace(/\.NS$/i,""), name:q.longName||q.shortName||symbol.replace(/\.NS$/i,""), price:Number.isFinite(price)?price:null, changePercent:Number.isFinite(changePercent)?changePercent:null, distanceFrom52Low:Number.isFinite(price)&&Number.isFinite(low)&&low>0?((price-low)/low)*100:null };
-}
-
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
@@ -276,22 +260,6 @@ export default {
       return json({ pe: await fetchSelectedPE(symbol) });
     }
 
-    if (url.pathname === "/api/market-stats") {
-      try {
-        const [gRaw, lRaw, lowRaw] = await Promise.all([
-          fetchYahooScreener("day_gainers"),
-          fetchYahooScreener("day_losers"),
-          fetchYahooScreener("52_week_lows")
-        ]);
-        const clean = raw => raw.map(marketQuote).filter(Boolean);
-        const gainers = clean(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
-        const losers = clean(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
-        let low52 = clean(lowRaw);
-        if (!low52.length) low52 = clean(await fetchYahooScreener("fifty_two_wk_losers"));
-        low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999));
-        return json({ gainers, losers, low52:low52.slice(0,8) });
-      } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
-    }
 
     if (url.pathname === "/api/stock") {
       const rawSymbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
