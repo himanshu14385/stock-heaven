@@ -280,12 +280,29 @@ export default {
         const last = history[history.length - 1];
         const previous = history.length > 1 ? history[history.length - 2] : last;
         // Prefer Yahoo's latest market quote; daily close can be one trading day behind.
-        const marketPrice = Number(result.meta?.regularMarketPrice);
+        const meta = result.meta || {};
+        const marketPrice = Number(meta.regularMarketPrice);
         const price = Number.isFinite(marketPrice) ? marketPrice : last.close;
-        const previousClose = Number(result.meta?.chartPreviousClose) || previous.close;
+
+        // Yahoo's meta contains the current/latest NSE session OHLC and previous close.
+        // Prefer those over the last daily candle so the page does not mix a live LTP
+        // with a stale/older daily OHLC bar. Daily history remains the fallback.
+        const metaPreviousClose = Number(meta.previousClose);
+        const metaChartPreviousClose = Number(meta.chartPreviousClose);
+        const previousClose = Number.isFinite(metaPreviousClose)
+          ? metaPreviousClose
+          : (Number.isFinite(metaChartPreviousClose) ? metaChartPreviousClose : previous.close);
+        const metaOpen = Number(meta.regularMarketOpen);
+        const metaHigh = Number(meta.regularMarketDayHigh);
+        const metaLow = Number(meta.regularMarketDayLow);
+        const metaVolume = Number(meta.regularMarketVolume);
+        const dayOpen = Number.isFinite(metaOpen) ? metaOpen : last.open;
+        const dayHigh = Number.isFinite(metaHigh) ? metaHigh : last.high;
+        const dayLow = Number.isFinite(metaLow) ? metaLow : last.low;
+        const dayVolume = Number.isFinite(metaVolume) ? metaVolume : last.volume;
         const change = price - previousClose;
         const percentChange = previousClose !== 0 ? (change / previousClose) * 100 : 0;
-        return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", price, previous_close: previousClose, change, percent_change: percentChange, day_high: last.high, day_low: last.low, volume: last.volume, year_high: result.meta?.fiftyTwoWeekHigh ?? null, year_low: result.meta?.fiftyTwoWeekLow ?? null, currency: result.meta?.currency || "INR", as_of: result.meta?.regularMarketTime ?? null, price_source: Number.isFinite(marketPrice) ? "Yahoo Finance regularMarketPrice" : "Yahoo Finance daily close", history });
+        return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", price, previous_close: previousClose, change, percent_change: percentChange, day_open: dayOpen, day_high: dayHigh, day_low: dayLow, volume: dayVolume, year_high: meta.fiftyTwoWeekHigh ?? null, year_low: meta.fiftyTwoWeekLow ?? null, currency: meta.currency || "INR", as_of: meta.regularMarketTime ?? null, price_source: Number.isFinite(marketPrice) ? "Yahoo Finance regularMarketPrice" : "Yahoo Finance daily close", ohlc_source: Number.isFinite(metaOpen) || Number.isFinite(metaHigh) || Number.isFinite(metaLow) ? "Yahoo Finance regularMarket session data" : "Yahoo Finance daily history", history });
       } catch (_) { return json({ error: "Unable to fetch stock data" }, 500); }
     }
     return env.ASSETS.fetch(request);
