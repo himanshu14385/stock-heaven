@@ -176,77 +176,38 @@ async function fetchSelectedPE(symbol) {
   try {
     const html = await fetchText(`https://www.screener.in/company/${encodeURIComponent(clean)}/`);
     if (!html) return null;
-    const m = html.match(/Stock P\/E[\s\S]{0,1200}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
-              html.match(/Stock P\/E[\s\S]{0,1200}?([0-9]+(?:\.[0-9]+)?)/i);
+    const m = html.match(/Stock P\/E[\s\S]{0,500}?class=["']number["'][^>]*>\s*([^<]+)/i) ||
+              html.match(/Stock P\/E[\s\S]{0,500}?([0-9]+(?:\.[0-9]+)?)/i);
     return m ? num(m[1]) : null;
   } catch (_) { return null; }
 }
-
-
-const SCANX_SLUG_ALIASES = {
-  AWL: ["adani-wilmar-ltd", "adani-wilmar"],
-  ZOMATO: ["zomato-ltd", "zomato"],
-  ETERNAL: ["zomato-ltd", "zomato"],
-  TMPV: ["tata-motors-passenger-vehicles-ltd", "tata-motors-passenger-vehicles"],
-  NMDCSTEEL: ["nmdc-steel-ltd", "nmdc-steel"]
-};
-
-function normalizeCompanyName(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/\b(limited|ltd|private|pvt|inc|corporation|corp|company|co)\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-async function findScanxSlugFromSitemap(company) {
+async function fetchYahooScreener(scrId) {
+  const u = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=50&scrIds=${encodeURIComponent(scrId)}&region=IN&lang=en-IN`;
   try {
-    const html = await fetchText("https://scanx.trade/sitemap");
-    if (!html) return null;
-    const targetNames = uniq([company.name, company.symbol]).map(normalizeCompanyName).filter(Boolean);
-    const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']*\/company\/([^/"']+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)];
-    let best = null;
-    let bestScore = 0;
-    for (const m of links) {
-      const slug = m[2];
-      const text = stripTags(m[3]);
-      const candidates = [normalizeCompanyName(text), normalizeCompanyName(slug.replace(/-/g, " "))];
-      let score = 0;
-      for (const t of targetNames) {
-        for (const c of candidates) {
-          if (!t || !c) continue;
-          if (t === c) score = Math.max(score, 100);
-          else if (c.includes(t) || t.includes(c)) score = Math.max(score, 80);
-          else {
-            const tw = new Set(t.split(" "));
-            const cw = new Set(c.split(" "));
-            const overlap = [...tw].filter(x => x.length > 2 && cw.has(x)).length;
-            if (overlap >= 2) score = Math.max(score, 50 + overlap);
-          }
-        }
-      }
-      if (score > bestScore) { bestScore = score; best = slug; }
-    }
-    return bestScore >= 80 ? best : null;
-  } catch (_) { return null; }
+    const r = await fetch(u, { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*" } });
+    if (!r.ok) return [];
+    const body = await r.json();
+    return body?.finance?.result?.[0]?.quotes || [];
+  } catch (_) { return []; }
+}
+function marketQuote(q) {
+  const symbol = String(q.symbol || "").toUpperCase();
+  if (!symbol.endsWith(".NS")) return null;
+  const price = Number(q.regularMarketPrice), changePercent = Number(q.regularMarketChangePercent), low = Number(q.fiftyTwoWeekLow);
+  return { symbol:symbol.replace(/\.NS$/i,""), name:q.longName||q.shortName||symbol.replace(/\.NS$/i,""), price:Number.isFinite(price)?price:null, changePercent:Number.isFinite(changePercent)?changePercent:null, distanceFrom52Low:Number.isFinite(price)&&Number.isFinite(low)&&low>0?((price-low)/low)*100:null };
 }
 
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
 
-  const cleanSymbol = String(company.symbol || symbol).toUpperCase().replace(/\.NS$/i, "");
   const base = slugifyName(company.name);
   const variants = uniq([
-    ...(SCANX_SLUG_ALIASES[cleanSymbol] || []),
     base,
     base.replace(/-ltd$/, "-limited"),
     base.replace(/-limited$/, "-ltd"),
     base.replace(/-limited$/, ""),
-    base.replace(/-ltd$/, ""),
-    cleanSymbol.toLowerCase()
+    String(company.symbol).toLowerCase()
   ]);
 
   for (const slug of variants) {
@@ -258,20 +219,6 @@ async function fetchDynamicPeers(symbol) {
       return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
     }
   }
-
-  // Final fallback: resolve the ScanX company URL from its public sitemap.
-  const sitemapSlug = await findScanxSlugFromSitemap(company);
-  if (sitemapSlug && !variants.includes(sitemapSlug)) {
-    const html = await fetchText(`https://scanx.trade/company/${encodeURIComponent(sitemapSlug)}/`);
-    if (html) {
-      const peers = parsePeerTables(html, company);
-      if (peers.length) {
-        const selected = await fetchSelectedMetrics(company.symbol, company.name);
-        return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
-      }
-    }
-  }
-
   return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", peers: [] };
 }
 
@@ -329,6 +276,22 @@ export default {
       return json({ pe: await fetchSelectedPE(symbol) });
     }
 
+    if (url.pathname === "/api/market-stats") {
+      try {
+        const [gRaw, lRaw, lowRaw] = await Promise.all([
+          fetchYahooScreener("day_gainers"),
+          fetchYahooScreener("day_losers"),
+          fetchYahooScreener("52_week_lows")
+        ]);
+        const clean = raw => raw.map(marketQuote).filter(Boolean);
+        const gainers = clean(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
+        const losers = clean(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
+        let low52 = clean(lowRaw);
+        if (!low52.length) low52 = clean(await fetchYahooScreener("fifty_two_wk_losers"));
+        low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999));
+        return json({ gainers, losers, low52:low52.slice(0,8) });
+      } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
+    }
 
     if (url.pathname === "/api/stock") {
       const rawSymbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
@@ -348,9 +311,13 @@ export default {
         if (!history.length) return json({ error: "No price history found" }, 404);
         const last = history[history.length - 1];
         const previous = history.length > 1 ? history[history.length - 2] : last;
-        const price = last.close, previousClose = previous.close, change = price - previousClose;
+        // Prefer Yahoo's latest market quote; daily close can be one trading day behind.
+        const marketPrice = Number(result.meta?.regularMarketPrice);
+        const price = Number.isFinite(marketPrice) ? marketPrice : last.close;
+        const previousClose = Number(result.meta?.chartPreviousClose) || previous.close;
+        const change = price - previousClose;
         const percentChange = previousClose !== 0 ? (change / previousClose) * 100 : 0;
-        return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", price, previous_close: previousClose, change, percent_change: percentChange, day_high: last.high, day_low: last.low, volume: last.volume, year_high: result.meta?.fiftyTwoWeekHigh ?? null, year_low: result.meta?.fiftyTwoWeekLow ?? null, currency: result.meta?.currency || "INR", history });
+        return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", price, previous_close: previousClose, change, percent_change: percentChange, day_high: last.high, day_low: last.low, volume: last.volume, year_high: result.meta?.fiftyTwoWeekHigh ?? null, year_low: result.meta?.fiftyTwoWeekLow ?? null, currency: result.meta?.currency || "INR", as_of: result.meta?.regularMarketTime ?? null, price_source: Number.isFinite(marketPrice) ? "Yahoo Finance regularMarketPrice" : "Yahoo Finance daily close", history });
       } catch (_) { return json({ error: "Unable to fetch stock data" }, 500); }
     }
     return env.ASSETS.fetch(request);
