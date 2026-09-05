@@ -1,0 +1,20 @@
+{
+  "name": "stock-heaven",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-05",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "stock-heaven-auth",
+      "database_id": "PASTE_YOUR_D1_DATABASE_ID_HERE"
+    }
+  ],
+  "vars": {
+    "ADMIN_USERNAME": "admin",
+    "DEFAULT_GUEST_USERNAME": "guest"
+  }
+}
