@@ -331,7 +331,7 @@ const DEFAULT_GUEST_PASSWORD = "Guest@2026";
 const ADMIN_FALLBACK_USERNAME = "admin";
 const ADMIN_FALLBACK_PASSWORD = "StockHeaven@2026";
 const GUEST_SESSION_SECONDS = 5 * 60;
-const ADMIN_SESSION_SECONDS = 10 * 365 * 24 * 60 * 60;
+const ADMIN_SESSION_SECONDS = 2147483647; // effectively non-expiring browser cookie; DB expiry is NULL for Admin
 
 function authCookie(token, maxAge) {
   return `__Host-stock_heaven_session=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
@@ -353,7 +353,7 @@ async function passwordHash(password,saltB64){
   const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},key,256);
   return {salt:bytesToB64(salt),hash:bytesToB64(new Uint8Array(bits))};
 }
-async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);return x.hash===hash;}
+async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);const a=b64ToBytes(x.hash),b=b64ToBytes(hash);if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;}
 async function authInit(env){
   if(!env.AUTH_DB) throw new Error("AUTH_DB binding missing");
   const db=env.AUTH_DB;
