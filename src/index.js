@@ -316,9 +316,40 @@ export default {
       const symbol = rawSymbol.endsWith(".NS") ? rawSymbol.slice(0, -3) : rawSymbol;
       const yahooSymbol = `${symbol}.NS`;
 
-      // NSE historical data from EquityPandit is the primary source for the
-      // displayed price/OHLC. This avoids Yahoo's occasional stale ETF candle
-      // problem where the API can return the previous trading session.
+      // Always fetch Yahoo history separately. The displayed quote/OHLC can come
+      // from the NSE historical source, but the dashboard needs the full daily
+      // history for 20/50/200 DMA and other technical calculations.
+      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=2y&interval=1d&events=div%2Csplits`;
+      let yahooData = null;
+      try {
+        const response = await fetch(yahooUrl, {
+          headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*" },
+          cache: "no-store"
+        });
+        if (response.ok) {
+          const body = await response.json();
+          const result = body?.chart?.result?.[0];
+          if (result) {
+            const timestamps = result.timestamp || [];
+            const quote = result.indicators?.quote?.[0] || {};
+            const history = timestamps.map((time, i) => ({
+              time,
+              open: quote.open?.[i] ?? null,
+              high: quote.high?.[i] ?? null,
+              low: quote.low?.[i] ?? null,
+              close: quote.close?.[i] ?? null,
+              volume: quote.volume?.[i] ?? null
+            })).filter(item => item.close !== null && Number.isFinite(Number(item.close)));
+            yahooData = {
+              history,
+              meta: result.meta || {}
+            };
+          }
+        }
+      } catch (_) {}
+
+      // NSE historical data remains the primary source for the displayed latest
+      // price/OHLC because Yahoo can occasionally expose a stale ETF candle.
       const ep = await fetchEquityPanditQuote(symbol);
       if (ep) {
         return json({
@@ -326,57 +357,41 @@ export default {
           yahoo_symbol: yahooSymbol,
           exchange: "NSE",
           currency: "INR",
-          ...ep
+          ...ep,
+          year_high: yahooData?.meta?.fiftyTwoWeekHigh ?? null,
+          year_low: yahooData?.meta?.fiftyTwoWeekLow ?? null,
+          history: yahooData?.history || []
         });
       }
 
-      // Fallback only when the NSE historical source is unavailable.
-      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1y&interval=1d&events=div%2Csplits`;
-      try {
-        const response = await fetch(yahooUrl, {
-          headers: { "User-Agent": "Mozilla/5.0" },
-          cache: "no-store"
-        });
-        if (!response.ok) return json({ error: "Stock data request failed", status: response.status }, 502);
-        const body = await response.json();
-        const result = body?.chart?.result?.[0];
-        if (!result) return json({ error: "Stock not found" }, 404);
-        const timestamps = result.timestamp || [];
-        const quote = result.indicators?.quote?.[0] || {};
-        const history = timestamps.map((time, i) => ({
-          time,
-          open: quote.open?.[i] ?? null,
-          high: quote.high?.[i] ?? null,
-          low: quote.low?.[i] ?? null,
-          close: quote.close?.[i] ?? null,
-          volume: quote.volume?.[i] ?? null
-        })).filter(item => item.close !== null);
-        if (!history.length) return json({ error: "No price history found" }, 404);
-        const last = history[history.length - 1];
-        const previous = history.length > 1 ? history[history.length - 2] : last;
-        const change = last.close - previous.close;
-        const percentChange = previous.close ? (change / previous.close) * 100 : 0;
-        return json({
-          symbol,
-          yahoo_symbol: yahooSymbol,
-          exchange: "NSE",
-          price: last.close,
-          previous_close: previous.close,
-          change,
-          percent_change: percentChange,
-          day_open: last.open,
-          day_high: last.high,
-          day_low: last.low,
-          volume: last.volume,
-          year_high: result.meta?.fiftyTwoWeekHigh ?? null,
-          year_low: result.meta?.fiftyTwoWeekLow ?? null,
-          currency: result.meta?.currency || "INR",
-          as_of: last.time,
-          price_source: "Yahoo Finance daily fallback",
-          ohlc_source: "Yahoo Finance daily fallback",
-          history
-        });
-      } catch (_) { return json({ error: "Unable to fetch stock data" }, 500); }
+      // If the NSE historical source is unavailable, use Yahoo for both quote
+      // and history.
+      const history = yahooData?.history || [];
+      if (!history.length) return json({ error: "No price history found" }, 404);
+      const last = history[history.length - 1];
+      const previous = history.length > 1 ? history[history.length - 2] : last;
+      const change = Number(last.close) - Number(previous.close);
+      const percentChange = Number(previous.close) ? (change / Number(previous.close)) * 100 : 0;
+      return json({
+        symbol,
+        yahoo_symbol: yahooSymbol,
+        exchange: "NSE",
+        price: Number(last.close),
+        previous_close: Number(previous.close),
+        change,
+        percent_change: percentChange,
+        day_open: last.open,
+        day_high: last.high,
+        day_low: last.low,
+        volume: last.volume,
+        year_high: yahooData.meta?.fiftyTwoWeekHigh ?? null,
+        year_low: yahooData.meta?.fiftyTwoWeekLow ?? null,
+        currency: yahooData.meta?.currency || "INR",
+        as_of: last.time,
+        price_source: "Yahoo Finance daily fallback",
+        ohlc_source: "Yahoo Finance daily fallback",
+        history
+      });
     }
     return env.ASSETS.fetch(request);
   }
