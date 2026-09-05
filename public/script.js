@@ -342,19 +342,19 @@ async function analyzeStock() {
 
         setText(
             "openPrice",
-            money(last.open)
+            money(result.day_open ?? last.open)
         );
 
 
         setText(
             "dayHigh",
-            money(last.high)
+            money(result.day_high ?? last.high)
         );
 
 
         setText(
             "dayLow",
-            money(last.low)
+            money(result.day_low ?? last.low)
         );
 
 
