@@ -24,7 +24,7 @@
   </section>
 
   <section class="admin-card db-manager">
-    <div class="section-heading"><div><span class="section-kicker">DATA MANAGEMENT</span><h2><i class="fa-solid fa-table-list"></i> Database Manager</h2><p>Stuck Stock, Alerts aur Fav Stock ka data directly D1 se manage karein.</p></div><div class="section-badge"><i class="fa-solid fa-cloud"></i> D1 Server Data</div></div>
+    <div class="section-heading"><div><span class="section-kicker">DATA MANAGEMENT</span><h2><i class="fa-solid fa-table-list"></i> Database Manager</h2><p>Stuck Stock, Alerts aur Fav Stock ka data directly D1 se manage karein.</p></div><div class="section-badge"><span id="dbStatus" class="db-status loading">Connecting…</span><button class="db-refresh" type="button" onclick="location.reload()" title="Refresh database"><i class="fa-solid fa-rotate-right"></i></button></div></div>
     <div class="db-tabs"><button class="db-tab active" data-db-tab="alerts"><i class="fa-solid fa-bell"></i><span>Alerts</span></button><button class="db-tab" data-db-tab="stuck"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></button><button class="db-tab" data-db-tab="favorites"><i class="fa-solid fa-star"></i><span>Fav Stock</span></button></div>
     <div id="dbManagerPanel"><div class="db-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading database…</div></div>
   </section>

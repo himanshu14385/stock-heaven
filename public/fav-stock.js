@@ -26,10 +26,20 @@ function esc(v){ return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":
 function symbolClean(v){ return String(v||"").trim().toUpperCase(); }
 function displaySymbol(v){ return symbolClean(v).replace(/\.NS$/i,""); }
 async function loadGroups(){
-  const r=await fetch('/api/data/favorites',{cache:'no-store'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to load favorites'); groups=Array.isArray(d.groups)?d.groups:[];
+  try{ if(window.StockHeavenAuth?.ready) await window.StockHeavenAuth.ready; }catch(_){}
+  const r=await fetch('/api/data/favorites',{credentials:'same-origin',cache:'no-store'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to load favorites'); groups=Array.isArray(d.groups)?d.groups:[];
 }
+let saveInProgress=false;
 async function saveGroups(){
-  const r=await fetch('/api/data/favorites',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({groups})}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to save favorites'); groups=Array.isArray(d.groups)?d.groups:groups;
+  if(saveInProgress) throw new Error('Another save is already in progress.');
+  saveInProgress=true;
+  try{
+    const r=await fetch('/api/data/favorites',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({groups})});
+    let d={};try{d=await r.json()}catch(_){}
+    if(!r.ok) throw new Error(d.error||d.detail||`Unable to save favorites (${r.status})`);
+    if(!Array.isArray(d.groups)) throw new Error('Server returned invalid favorite data.');
+    groups=d.groups;
+  }finally{saveInProgress=false}
 }
 function formatPrice(v){ return Number.isFinite(Number(v)) ? `₹${Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}` : "--"; }
 function formatChange(v,p){
@@ -202,5 +212,5 @@ function editStockNote(groupId,index){if(!window.requireAdmin())return;
   if(note===null)return;
   g.stocks[index].note=note.trim(); saveGroups().then(render).catch(e=>alert(e.message||"Save failed"));
 }
-document.addEventListener("DOMContentLoaded",async()=>{ try{await loadGroups();render();await refreshPrices();}catch(e){alert(e.message||"Favourite data load nahi ho paya.");render();} });
+document.addEventListener("DOMContentLoaded",async()=>{ try{if(window.StockHeavenAuth?.ready) await window.StockHeavenAuth.ready; await loadGroups();render();await refreshPrices();}catch(e){console.error(e);const box=document.getElementById("favCards");if(box)box.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><h3>Favourite data load nahi ho paya</h3><p>${esc(e.message||"Server se data nahi mil raha.")}</p><button type="button" onclick="location.reload()"><i class="fa-solid fa-rotate-right"></i> Retry</button></div>`;} });
 setInterval(refreshPrices,60000);
