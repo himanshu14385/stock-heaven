@@ -258,9 +258,51 @@ function serverFallbackPeers(symbol){
   return list.map(([symbol,name])=>({symbol,name,ltp:null,pe:null,rsi:null}));
 }
 
+function parseScreenerPeerTables(html, selectedSymbol){
+  const tables=[...String(html||'').matchAll(/<table\b[^>]*>[\s\S]*?<\/table>/gi)].map(m=>m[0]);
+  let best=[];
+  const selected=String(selectedSymbol||'').toUpperCase().replace(/\.NS$/i,'');
+  for(const table of tables){
+    const headerMatch=table.match(/<thead[\s\S]*?<\/thead>/i);
+    const header=stripTags(headerMatch?headerMatch[0]:table).toLowerCase();
+    if(!(/p\s*\/\s*e|p\.e/.test(header) && /(cmp|current market price|price)/.test(header))) continue;
+    const rows=[...table.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)].map(m=>m[0]);
+    const headCells=headerMatch?[...headerMatch[0].matchAll(/<t[dh]\b[^>]*>[\s\S]*?<\/t[dh]>/gi)].map(m=>stripTags(m[0]).toLowerCase()):[];
+    const cmpIdx=headCells.findIndex(x=>/cmp|current market price|price/.test(x));
+    const peIdx=headCells.findIndex(x=>/p\s*\/\s*e|p\.e/.test(x));
+    const peers=[];
+    for(const row of rows){
+      const cells=[...row.matchAll(/<t[dh]\b[^>]*>[\s\S]*?<\/t[dh]>/gi)].map(m=>m[0]);
+      if(cells.length<3) continue;
+      const plain=cells.map(c=>stripTags(c));
+      const nameCell=cells.find(c=>/href=["'][^"']*\/company\//i.test(c)) || cells[0];
+      const link=nameCell.match(/\/company\/([^/"']+)/i);
+      const symbol=link?link[1].toUpperCase():'';
+      const name=stripTags(nameCell).replace(/\s+/g,' ').trim();
+      if(!name || !symbol || symbol===selected) continue;
+      const ltp=cmpIdx>=0?num(plain[cmpIdx]):num(plain[1]);
+      const pe=peIdx>=0?num(plain[peIdx]):num(plain[2]);
+      if(ltp==null && pe==null) continue;
+      peers.push({symbol,name,ltp,pe,rsi:null});
+      if(peers.length>=10) break;
+    }
+    if(peers.length>best.length) best=peers;
+  }
+  return best;
+}
+
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
+
+  const screenerHtml = await fetchText(`https://www.screener.in/company/${encodeURIComponent(company.symbol)}/`);
+  if (screenerHtml) {
+    const peers = parseScreenerPeerTables(screenerHtml, company.symbol);
+    if (peers.length) {
+      const selected = await fetchSelectedMetrics(company.symbol, company.name);
+      return { symbol: company.symbol, name: company.name, source: "Screener peer comparison", selected, peers: peers.slice(0, 10) };
+    }
+  }
 
   const base = slugifyName(company.name);
   const variants = uniq([
@@ -270,7 +312,6 @@ async function fetchDynamicPeers(symbol) {
     base.replace(/-limited$/, ""),
     String(company.symbol).toLowerCase()
   ]);
-
   for (const slug of variants) {
     const html = await fetchText(`https://scanx.trade/company/${encodeURIComponent(slug)}/`);
     if (!html) continue;
@@ -280,7 +321,7 @@ async function fetchDynamicPeers(symbol) {
       return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
     }
   }
-  return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison + fallback", peers: serverFallbackPeers(company.symbol) };
+  return { symbol: company.symbol, name: company.name, source: "Screener + ScanX + fallback", peers: serverFallbackPeers(company.symbol) };
 }
 
 
@@ -316,18 +357,20 @@ async function verifyPassword(password,hash,salt){const x=await passwordHash(pas
 async function authInit(env){
   if(!env.AUTH_DB) throw new Error("AUTH_DB binding missing");
   const db=env.AUTH_DB;
+  // D1 schema is provisioned by schema.sql. Keep runtime initialization
+  // lightweight and idempotent; do not run ALTER TABLE migrations per request.
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_settings (id INTEGER PRIMARY KEY CHECK (id=1),guest_username TEXT NOT NULL,guest_password_hash TEXT NOT NULL,guest_password_salt TEXT NOT NULL,guest_version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT,token_hash TEXT NOT NULL UNIQUE,role TEXT NOT NULL CHECK(role IN ('admin','guest')),username TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT)`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(token_hash)`).run();
-  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_restrictions (page TEXT PRIMARY KEY,restricted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
-  try { await db.prepare(`ALTER TABLE stuck_stocks ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
-  try { await db.prepare(`ALTER TABLE alerts ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
-  try { await db.prepare(`ALTER TABLE favorite_stocks ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
   const row=await db.prepare(`SELECT id FROM auth_settings WHERE id=1`).first();
-  if(!row){const hp=await passwordHash(env.DEFAULT_GUEST_PASSWORD||DEFAULT_GUEST_PASSWORD);await db.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(env.DEFAULT_GUEST_USERNAME||DEFAULT_GUEST_USERNAME,hp.hash,hp.salt,1,nowIso()).run();}
-  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();}
+  if(!row){
+    const hp=await passwordHash(env.DEFAULT_GUEST_PASSWORD||DEFAULT_GUEST_PASSWORD);
+    await db.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(env.DEFAULT_GUEST_USERNAME||DEFAULT_GUEST_USERNAME,hp.hash,hp.salt,1,nowIso()).run();
+  }
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){
+    await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
+  }
 }
 async function currentAuth(request,env){
   await authInit(env);
@@ -497,7 +540,12 @@ export default {
 
     const protectedPage = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\//, "");
     if (AUTH_PAGES.has(protectedPage)) {
-      const s = await currentAuth(request, env);
+      let s;
+      try { s = await currentAuth(request, env); }
+      catch (e) {
+        const msg=String(e?.message||e).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+        return new Response(`<h1>Authentication service error</h1><p>Please refresh and try again.</p><pre>${msg}</pre>`,{status:500,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      }
       if (!s) return new Response("<h1>Login required</h1><p>Please login to Stock Heaven.</p><a href=\"/login.html\">Go to Login</a>",{status:401,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
       if (protectedPage === "admin.html" && s.role !== "admin") return new Response("<h1>Admin only</h1>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
       if (s.role === "guest" && protectedPage !== "admin.html") { const rr=await env.AUTH_DB.prepare(`SELECT restricted FROM auth_restrictions WHERE page=?`).bind(protectedPage).first(); if (rr?.restricted) return new Response("<h1>Page Restricted</h1><p>Admin ne is page ko Guest ke liye restrict kiya hai.</p><a href=\"/index.html\">Back to Dashboard</a>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}}); }
