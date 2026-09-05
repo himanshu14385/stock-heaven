@@ -90,14 +90,56 @@ function handleSummarySearch(e){
   if(e.key==="Enter") showSummaryQuote(document.getElementById("stockInput").value);
 }
 
+const FALLBACK_PEER_MAP = {
+  RELIANCE:[['ONGC','Oil & Natural Gas Corporation'],['IOC','Indian Oil Corporation'],['BPCL','Bharat Petroleum Corporation'],['HINDPETRO','Hindustan Petroleum Corporation'],['MRPL','Mangalore Refinery & Petroleum'],['CHENNPETRO','Chennai Petroleum Corporation'],['GAIL','GAIL (India) Limited']],
+  TCS:[['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['MPHASIS','Mphasis'],['COFORGE','Coforge']],
+  INFY:[['TCS','Tata Consultancy Services'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['MPHASIS','Mphasis'],['COFORGE','Coforge']],
+  HDFCBANK:[['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank']],
+  ICICIBANK:[['HDFCBANK','HDFC Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank']],
+  SBIN:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank'],['CANBK','Canara Bank']],
+  AXISBANK:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda']],
+  KOTAKBANK:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda']],
+  ITC:[['HINDUNILVR','Hindustan Unilever'],['NESTLEIND','Nestle India'],['BRITANNIA','Britannia Industries'],['GODREJCP','Godrej Consumer Products'],['MARICO','Marico'],['DABUR','Dabur India'],['COLPAL','Colgate-Palmolive (India)']],
+  HINDUNILVR:[['ITC','ITC Limited'],['NESTLEIND','Nestle India'],['BRITANNIA','Britannia Industries'],['GODREJCP','Godrej Consumer Products'],['MARICO','Marico'],['DABUR','Dabur India']],
+  BHARTIARTL:[['JIOFIN','Jio Financial Services'],['TATACOMM','Tata Communications'],['INDUSTOWER','Indus Towers'],['IDEA','Vodafone Idea'],['RCOM','Reliance Communications']],
+  AWL:[['DABUR','Dabur India'],['GODREJCP','Godrej Consumer Products'],['EMAMILTD','Emami'],['MARICO','Marico'],['HINDUNILVR','Hindustan Unilever'],['ITC','ITC Limited']],
+  ADANIENSOL:[['ADANIGREEN','Adani Green Energy'],['NTPC','NTPC'],['POWERGRID','Power Grid Corporation'],['TATAPOWER','Tata Power'],['JSWENERGY','JSW Energy'],['ADANIPOWER','Adani Power']],
+  ADANIGREEN:[['ADANIPOWER','Adani Power'],['NTPC','NTPC'],['POWERGRID','Power Grid Corporation'],['TATAPOWER','Tata Power'],['JSWENERGY','JSW Energy'],['RPOWER','Reliance Power']],
+  ADANIPOWER:[['ADANIGREEN','Adani Green Energy'],['NTPC','NTPC'],['TATAPOWER','Tata Power'],['JSWENERGY','JSW Energy'],['POWERGRID','Power Grid Corporation']],
+  TATAPOWER:[['ADANIPOWER','Adani Power'],['ADANIGREEN','Adani Green Energy'],['NTPC','NTPC'],['JSWENERGY','JSW Energy'],['POWERGRID','Power Grid Corporation']],
+  JSWENERGY:[['TATAPOWER','Tata Power'],['NTPC','NTPC'],['ADANIGREEN','Adani Green Energy'],['ADANIPOWER','Adani Power'],['POWERGRID','Power Grid Corporation']],
+  NTPC:[['POWERGRID','Power Grid Corporation'],['TATAPOWER','Tata Power'],['ADANIPOWER','Adani Power'],['ADANIGREEN','Adani Green Energy'],['JSWENERGY','JSW Energy'],['NHPC','NHPC']],
+  POWERGRID:[['NTPC','NTPC'],['TATAPOWER','Tata Power'],['ADANIPOWER','Adani Power'],['ADANIGREEN','Adani Green Energy'],['JSWENERGY','JSW Energy'],['NHPC','NHPC']],
+  NSLNISP:[['JINDALSTEL','Jindal Steel & Power'],['SAIL','Steel Authority of India'],['TATASTEEL','Tata Steel'],['JSWSTEEL','JSW Steel'],['HINDALCO','Hindalco Industries'],['NMDC','NMDC']],
+  TATASTEEL:[['JSWSTEEL','JSW Steel'],['JINDALSTEL','Jindal Steel & Power'],['SAIL','Steel Authority of India'],['HINDALCO','Hindalco Industries'],['NMDC','NMDC']],
+  JSWSTEEL:[['TATASTEEL','Tata Steel'],['JINDALSTEL','Jindal Steel & Power'],['SAIL','Steel Authority of India'],['HINDALCO','Hindalco Industries'],['NMDC','NMDC']],
+  TMPV:[['MARUTI','Maruti Suzuki India'],['M&M','Mahindra & Mahindra'],['HYUNDAI','Hyundai Motor India'],['EICHERMOT','Eicher Motors'],['HEROMOTOCO','Hero MotoCorp'],['BAJAJ-AUTO','Bajaj Auto']],
+  MARUTI:[['M&M','Mahindra & Mahindra'],['TMPV','Tata Motors Passenger Vehicles'],['EICHERMOT','Eicher Motors'],['HEROMOTOCO','Hero MotoCorp'],['BAJAJ-AUTO','Bajaj Auto'],['HYUNDAI','Hyundai Motor India']],
+  'M&M':[['MARUTI','Maruti Suzuki India'],['TMPV','Tata Motors Passenger Vehicles'],['EICHERMOT','Eicher Motors'],['HEROMOTOCO','Hero MotoCorp'],['BAJAJ-AUTO','Bajaj Auto']],
+  HCLTECH:[['TCS','Tata Consultancy Services'],['INFY','Infosys Limited'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['COFORGE','Coforge']],
+  WIPRO:[['TCS','Tata Consultancy Services'],['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['COFORGE','Coforge']],
+  TECHM:[['TCS','Tata Consultancy Services'],['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['LTIM','LTIMindtree'],['COFORGE','Coforge']],
+  LT:[['ABB','ABB India'],['SIEMENS','Siemens'],['BHEL','Bharat Heavy Electricals'],['CUMMINSIND','Cummins India'],['THERMAX','Thermax']],
+  HDFCNIFBAN:[['ICICIBANK','ICICI Bank'],['HDFCBANK','HDFC Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank']],
+  ITBEES:[['TCS','Tata Consultancy Services'],['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra']],
+  BANKBEES:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank']],
+  GOLDBEES:[['TATAGOLD','Tata Gold Exchange Traded Fund']],
+  TATAGOLD:[['GOLDBEES','Nippon India ETF Gold BeES']],
+};
+const DEFAULT_FALLBACK_PEERS=[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['ITC','ITC Limited'],['TCS','Tata Consultancy Services']];
+function fallbackPeersFor(symbol){
+  const key=cleanSummarySymbol(symbol).replace(/\.NS$/i,'');
+  return (FALLBACK_PEER_MAP[key]||DEFAULT_FALLBACK_PEERS).map(([symbol,name])=>({symbol,name,ltp:null,pe:null,rsi:null}));
+}
+
 async function fetchDynamicPeers(selectedSymbol){
   try{
-    const response=await fetch(`/api/peers?symbol=${encodeURIComponent(selectedSymbol)}`);
+    const response=await fetch(`/api/peers?symbol=${encodeURIComponent(selectedSymbol)}`,{cache:'no-store'});
     const data=await response.json();
-    if(!response.ok || data.error) return [];
-    return Array.isArray(data.peers) ? data.peers.slice(0,10) : [];
+    const live=(!response.ok || data.error || !Array.isArray(data.peers)) ? [] : data.peers.filter(Boolean).slice(0,10);
+    return live.length ? live : fallbackPeersFor(selectedSymbol);
   }catch(e){
-    return [];
+    return fallbackPeersFor(selectedSymbol);
   }
 }
 
