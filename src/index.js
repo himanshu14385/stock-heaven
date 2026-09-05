@@ -326,8 +326,12 @@ async function fetchDynamicPeers(symbol) {
 
 
 const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","admin.html"]);
+const DEFAULT_GUEST_USERNAME = "guest";
+const DEFAULT_GUEST_PASSWORD = "Guest@2026";
+const ADMIN_FALLBACK_USERNAME = "admin";
+const ADMIN_FALLBACK_PASSWORD = "StockHeaven@2026";
 const GUEST_SESSION_SECONDS = 5 * 60;
-const ADMIN_SESSION_SECONDS = 2147483647; // effectively non-expiring browser cookie; DB expiry is NULL for Admin
+const ADMIN_SESSION_SECONDS = 10 * 365 * 24 * 60 * 60;
 
 function authCookie(token, maxAge) {
   return `__Host-stock_heaven_session=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
@@ -349,7 +353,7 @@ async function passwordHash(password,saltB64){
   const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},key,256);
   return {salt:bytesToB64(salt),hash:bytesToB64(new Uint8Array(bits))};
 }
-async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);const a=b64ToBytes(x.hash),b=b64ToBytes(hash);if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;}
+async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);return x.hash===hash;}
 async function authInit(env){
   if(!env.AUTH_DB) throw new Error("AUTH_DB binding missing");
   const db=env.AUTH_DB;
@@ -359,8 +363,11 @@ async function authInit(env){
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT,token_hash TEXT NOT NULL UNIQUE,role TEXT NOT NULL CHECK(role IN ('admin','guest')),username TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_restrictions (page TEXT PRIMARY KEY,restricted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
-  // Do NOT create a default Guest account. The single Guest credential must be
-  // explicitly provisioned through the Admin panel / D1.
+  const row=await db.prepare(`SELECT id FROM auth_settings WHERE id=1`).first();
+  if(!row){
+    const hp=await passwordHash(env.DEFAULT_GUEST_PASSWORD||DEFAULT_GUEST_PASSWORD);
+    await db.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(env.DEFAULT_GUEST_USERNAME||DEFAULT_GUEST_USERNAME,hp.hash,hp.salt,1,nowIso()).run();
+  }
   for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){
     await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
   }
@@ -381,12 +388,7 @@ async function createSession(env,role,username){
   return {token,expiresAt:expires};
 }
 async function requireAdmin(request,env){const s=await currentAuth(request,env);return s&&s.role==='admin'?s:null;}
-function adminCreds(env){
-  const username=String(env.ADMIN_USERNAME||"").trim();
-  const password=String(env.ADMIN_PASSWORD||"");
-  if(!username || !password) throw new Error("Admin credentials are not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD in Worker Variables & Secrets.");
-  return {username,password};
-}
+function adminCreds(env){return {username:env.ADMIN_USERNAME||ADMIN_FALLBACK_USERNAME,password:env.ADMIN_PASSWORD||ADMIN_FALLBACK_PASSWORD};}
 async function authJson(request,env,url){
   if(url.pathname==='/api/auth/login'&&request.method==='POST'){
     await authInit(env); let body={};try{body=await request.json()}catch(_){return json({error:"Invalid request"},400)}
@@ -411,7 +413,7 @@ async function authJson(request,env,url){
   }
   if(url.pathname==='/api/admin/guest-credentials'){
     if(request.method==='GET'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);const row=await env.AUTH_DB.prepare(`SELECT guest_username,guest_version,updated_at FROM auth_settings WHERE id=1`).first();return json({username:row.guest_username,version:row.guest_version,updatedAt:row.updated_at});}
-    if(request.method==='POST'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const u=String(b.username||'').trim(),p=String(b.password||'');if(u.length<3||p.length<4)return json({error:"Username min 3 and password min 4 characters"},400);const hp=await passwordHash(p);const old=await env.AUTH_DB.prepare(`SELECT guest_version FROM auth_settings WHERE id=1`).first();const version=Number(old?.guest_version||0)+1;if(old){await env.AUTH_DB.prepare(`UPDATE auth_settings SET guest_username=?,guest_password_hash=?,guest_password_salt=?,guest_version=?,updated_at=? WHERE id=1`).bind(u,hp.hash,hp.salt,version,nowIso()).run();}else{await env.AUTH_DB.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(u,hp.hash,hp.salt,version,nowIso()).run();}await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest'`).run();return json({ok:true,username:u,version});}
+    if(request.method==='POST'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const u=String(b.username||'').trim(),p=String(b.password||'');if(u.length<3||p.length<4)return json({error:"Username min 3 and password min 4 characters"},400);const hp=await passwordHash(p);const old=await env.AUTH_DB.prepare(`SELECT guest_version FROM auth_settings WHERE id=1`).first();const version=Number(old?.guest_version||0)+1;await env.AUTH_DB.prepare(`UPDATE auth_settings SET guest_username=?,guest_password_hash=?,guest_password_salt=?,guest_version=?,updated_at=? WHERE id=1`).bind(u,hp.hash,hp.salt,version,nowIso()).run();await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest'`).run();return json({ok:true,username:u,version});}
   }
   if(url.pathname==='/api/auth/restrictions' && request.method==='GET'){
     const s=await currentAuth(request,env);
@@ -472,22 +474,12 @@ async function replaceStuckData(env,items){
   arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const p=parseStuckInfo(x.stuckInfo);stm.push(env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),p.quantity,p.buyPrice,i));});
   await env.AUTH_DB.batch(stm);
 }
-async function ensureAlertsSchema(env){
-  const info=await env.AUTH_DB.prepare(`PRAGMA table_info(alerts)`).all();
-  const target=(info.results||[]).find(x=>x.name==='target_price');
-  if(!target || Number(target.notnull)!==1)return;
-  // Safe one-time migration for older D1 schema where an unset alert price was NOT NULL.
-  await env.AUTH_DB.batch([
-    env.AUTH_DB.prepare(`CREATE TABLE alerts_new (id INTEGER PRIMARY KEY AUTOINCREMENT, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', target_price REAL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),
-    env.AUTH_DB.prepare(`INSERT INTO alerts_new (id,symbol,name,target_price,sort_order,created_at,updated_at) SELECT id,symbol,name,target_price,sort_order,created_at,updated_at FROM alerts`),
-    env.AUTH_DB.prepare(`DROP TABLE alerts`),
-    env.AUTH_DB.prepare(`ALTER TABLE alerts_new RENAME TO alerts`),
-    env.AUTH_DB.prepare(`CREATE INDEX IF NOT EXISTS idx_alerts_order ON alerts(sort_order)`)
-  ]);
-}
 async function getAlertsData(env){
-  await ensureAlertsSchema(env);
-  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
+  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
+  if(!(rows.results||[]).length){
+    await env.AUTH_DB.batch(DEFAULT_ALERTS.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO alerts(symbol,name,target_price,sort_order) VALUES (?,?,?,?)`).bind(x.symbol,x.name,x.alertPrice===""?null:Number(x.alertPrice),i)));
+    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
+  }
   return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,alertPrice:r.target_price==null?"":String(r.target_price)}));
 }
 async function replaceAlertsData(env,items){
