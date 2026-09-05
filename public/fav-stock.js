@@ -47,21 +47,24 @@ function render(){
     return;
   }
   box.innerHTML=groups.map(g=>{
+    const collapsed=!!g.collapsed;
     const rows=(g.stocks||[]).map((s,idx)=>{
       const p=prices[s.symbol]||{};
       const ch=Number(p.change), pc=Number(p.percent_change);
       const cls=Number.isFinite(ch)&&ch<0?"down":"up";
-      return `<div class="fav-stock-row">
-        <div class="fav-stock-main"><div class="fav-logo">${esc(initials(s.name||s.symbol))}</div><div><b>${esc(s.name||s.symbol)}</b><small>${esc(displaySymbol(s.symbol))}</small></div></div>
+      const note=String(s.note||"").trim();
+      return `<div class="fav-stock-row" draggable="true" data-group-id="${esc(g.id)}" data-stock-index="${idx}" ondragstart="dragStock(event,'${g.id}',${idx})" ondragover="allowStockDrop(event)" ondrop="dropStock(event,'${g.id}',${idx})">
+        <div class="fav-drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
+        <div class="fav-stock-main"><div class="fav-logo">${esc(initials(s.name||s.symbol))}</div><div class="fav-stock-copy"><b>${esc(s.name||s.symbol)}</b><small>${esc(displaySymbol(s.symbol))}</small>${note?`<span class="fav-stock-note"><i class="fa-regular fa-note-sticky"></i> ${esc(note)}</span>`:""}</div></div>
         <div class="fav-stock-market"><strong>${formatPrice(p.price)}</strong><span class="${cls}">${formatChange(ch,pc)}</span></div>
-        <button class="fav-remove-stock" type="button" title="Remove stock" onclick="event.stopPropagation();removeStock('${g.id}',${idx})"><i class="fa-solid fa-xmark"></i></button>
+        <div class="fav-stock-actions"><button class="fav-note-stock" type="button" title="${note?"Edit note":"Add note"}" onclick="event.stopPropagation();editStockNote('${g.id}',${idx})"><i class="fa-regular fa-note-sticky"></i></button><button class="fav-remove-stock" type="button" title="Remove stock" onclick="event.stopPropagation();removeStock('${g.id}',${idx})"><i class="fa-solid fa-xmark"></i></button></div>
       </div>`;
     }).join("");
-    return `<article class="fav-card">
-      <div class="fav-card-head"><div class="fav-card-title"><div class="fav-card-star"><i class="fa-solid fa-star"></i></div><div><h3>${esc(g.title)}</h3><span>${(g.stocks||[]).length} ${(g.stocks||[]).length===1?"stock":"stocks"}</span></div></div>
-      <div class="fav-card-actions"><button type="button" title="Edit title" onclick="openEditCard('${g.id}')"><i class="fa-solid fa-pen"></i></button><button type="button" title="Delete card" onclick="deleteCard('${g.id}')"><i class="fa-solid fa-trash"></i></button></div></div>
-      <div class="fav-stock-list">${rows || `<div class="fav-card-empty"><i class="fa-regular fa-star"></i><span>No stocks added yet</span></div>`}</div>
-      <button class="fav-add-stock" type="button" onclick="openStockModal('${g.id}')"><i class="fa-solid fa-plus"></i> Add Stock</button>
+    return `<article class="fav-card ${collapsed?"is-collapsed":""}">
+      <div class="fav-card-head"><div class="fav-card-title" onclick="toggleCard('${g.id}')" title="${collapsed?"Expand":"Collapse"} card"><div class="fav-card-star"><i class="fa-solid fa-star"></i></div><div><h3>${esc(g.title)}</h3><span>${(g.stocks||[]).length} ${(g.stocks||[]).length===1?"stock":"stocks"}</span></div></div>
+      <div class="fav-card-actions"><button type="button" title="${collapsed?"Expand":"Collapse"} card" onclick="toggleCard('${g.id}')"><i class="fa-solid fa-chevron-${collapsed?"down":"up"}"></i></button><button type="button" title="Edit title" onclick="openEditCard('${g.id}')"><i class="fa-solid fa-pen"></i></button><button type="button" title="Delete card" onclick="deleteCard('${g.id}')"><i class="fa-solid fa-trash"></i></button></div></div>
+      <div class="fav-card-body"><div class="fav-stock-list">${rows || `<div class="fav-card-empty"><i class="fa-regular fa-star"></i><span>No stocks added yet</span></div>`}</div>
+      <button class="fav-add-stock" type="button" onclick="openStockModal('${g.id}')"><i class="fa-solid fa-plus"></i> Add Stock</button></div>
     </article>`;
   }).join("");
 }
@@ -128,13 +131,34 @@ function addStock(symbol,name){
 }
 function addManualStock(){ const q=symbolClean(document.getElementById("favStockInput").value); if(!q){alert("Stock symbol enter karo");return;} addStock(q,q); }
 function removeStock(groupId,index){ const g=groups.find(x=>x.id===groupId); if(!g)return; g.stocks.splice(index,1); saveGroups(); render(); }
-async function fetchPrice(symbol){
-  if(prices[symbol]) return;
-  try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`); const d=await r.json(); if(r.ok&&!d.error){prices[symbol]={price:Number(d.price),change:Number(d.change),percent_change:Number(d.percent_change)};render();}}catch(e){}
+async function fetchPrice(symbol, force=false){
+  if(!force && prices[symbol]) return;
+  try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`, {cache:"no-store"}); const d=await r.json(); if(r.ok&&!d.error){prices[symbol]={price:Number(d.price),change:Number(d.change),percent_change:Number(d.percent_change),as_of:d.as_of||null}; render();}}catch(e){}
 }
 async function refreshPrices(){
   const symbols=[...new Set(groups.flatMap(g=>(g.stocks||[]).map(s=>s.symbol)))];
-  await Promise.all(symbols.map(fetchPrice));
+  await Promise.all(symbols.map(s=>fetchPrice(s,true)));
+}
+let draggedStock=null;
+function dragStock(event,groupId,index){ draggedStock={groupId,index}; event.dataTransfer.effectAllowed="move"; event.dataTransfer.setData("text/plain", `${groupId}:${index}`); event.currentTarget.classList.add("dragging"); }
+function allowStockDrop(event){ event.preventDefault(); event.dataTransfer.dropEffect="move"; }
+function dropStock(event,groupId,targetIndex){
+  event.preventDefault();
+  if(!draggedStock || draggedStock.groupId!==groupId) return;
+  const g=groups.find(x=>x.id===groupId); if(!g) return;
+  const from=draggedStock.index; if(from===targetIndex) return;
+  const [item]=g.stocks.splice(from,1);
+  g.stocks.splice(from<targetIndex?targetIndex-1:targetIndex,0,item);
+  draggedStock=null; saveGroups(); render();
+}
+document.addEventListener("dragend",()=>{document.querySelectorAll(".fav-stock-row.dragging").forEach(x=>x.classList.remove("dragging")); draggedStock=null;});
+function toggleCard(id){ const g=groups.find(x=>x.id===id); if(!g)return; g.collapsed=!g.collapsed; saveGroups(); render(); }
+function editStockNote(groupId,index){
+  const g=groups.find(x=>x.id===groupId); if(!g||!g.stocks[index])return;
+  const current=String(g.stocks[index].note||"");
+  const note=prompt("Stock note enter kijiye (blank chhodne par note remove ho jayega):", current);
+  if(note===null)return;
+  g.stocks[index].note=note.trim(); saveGroups(); render();
 }
 render(); refreshPrices();
 setInterval(refreshPrices,60000);
