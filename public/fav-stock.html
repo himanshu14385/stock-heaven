@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fav Stock • Stock Heaven</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fav-stock.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+<div class="page">
+<header class="top-header">
+    <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div><h1>Stock Heaven</h1><p>Simple stock analysis</p></div>
+    </div>
+</header>
+
+<nav class="main-nav">
+    <div class="nav-inner">
+        <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+        <a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+        <a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+        <a href="fav-stock.html" class="nav-item active"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
+    </div>
+</nav>
+
+<main class="fav-main">
+<section class="fav-shell">
+    <div class="fav-header">
+        <div class="fav-title-wrap">
+            <div class="fav-icon"><i class="fa-solid fa-star"></i></div>
+            <div>
+                <h2>Fav Stock</h2>
+                <p>Create your own stock groups and keep your favourite stocks together.</p>
+            </div>
+        </div>
+        <button class="fav-add-card" type="button" onclick="openCardModal()"><i class="fa-solid fa-plus"></i> Add Card</button>
+    </div>
+
+    <div class="fav-toolbar">
+        <div class="fav-count"><i class="fa-solid fa-layer-group"></i><span id="cardCount">0 cards</span></div>
+        <div class="fav-note">Your custom groups</div>
+    </div>
+
+    <div id="favCards" class="fav-cards"></div>
+</section>
+</main>
+
+<div id="cardModal" class="fav-modal" aria-hidden="true">
+  <div class="fav-modal-backdrop" onclick="closeCardModal()"></div>
+  <div class="fav-modal-box">
+    <div class="fav-modal-head">
+      <div><h3 id="modalTitle">Add Card</h3><p>Give this group a name.</p></div>
+      <button class="fav-close" type="button" onclick="closeCardModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <label class="fav-label" for="cardTitleInput">Card Title</label>
+    <input id="cardTitleInput" class="fav-input" maxlength="40" placeholder="e.g. Focus ETF" onkeydown="cardTitleKey(event)">
+    <div class="fav-modal-actions">
+      <button type="button" class="fav-btn secondary" onclick="closeCardModal()">Cancel</button>
+      <button type="button" class="fav-btn primary" onclick="saveCard()"><i class="fa-solid fa-check"></i> Save Card</button>
+    </div>
+  </div>
+</div>
+
+<div id="stockModal" class="fav-modal" aria-hidden="true">
+  <div class="fav-modal-backdrop" onclick="closeStockModal()"></div>
+  <div class="fav-modal-box fav-stock-modal-box">
+    <div class="fav-modal-head">
+      <div><h3>Add Stock</h3><p id="stockModalSubtitle">Choose a stock for this card.</p></div>
+      <button class="fav-close" type="button" onclick="closeStockModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="fav-search-wrap">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input id="favStockInput" autocomplete="off" placeholder="Search stock or symbol..." oninput="searchFavStocks()" onkeydown="favStockKey(event)">
+    </div>
+    <div id="favSuggestions" class="fav-suggestions"></div>
+    <div class="fav-manual"><span>Can’t find it?</span><button type="button" onclick="addManualStock()">Add symbol manually</button></div>
+  </div>
+</div>
+
+<script src="fav-stock.js"></script>
+</body>
+</html>
