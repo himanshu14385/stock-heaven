@@ -10,7 +10,7 @@
     {
       "binding": "AUTH_DB",
       "database_name": "stock-heaven-auth",
-      "database_id": "PASTE_YOUR_D1_DATABASE_ID_HERE"
+      "database_id": "39e33b4b-0863-4eb8-8cab-35429a7e38f0"
     }
   ],
   "vars": {
