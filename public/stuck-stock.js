@@ -1,28 +1,13 @@
-const STUCK_STORAGE_KEY = "stockHeavenStuckStocks";
-
-const defaultStuckStocks = [
-    { symbol: "AWL", name: "Adani Wilmar Limited", stuckInfo: "208 × 647.73" },
-    { symbol: "ADANIENSOL", name: "Adani Energy Solutions Limited", stuckInfo: "33 × 2788.12" },
-    { symbol: "AWL", name: "Adani Wilmar Limited", stuckInfo: "36 × 683.35" },
-    { symbol: "ADANIGREEN", name: "Adani Green Energy", stuckInfo: "9 × 2333.43" },
-    { symbol: "FMCGIETF.NS", name: "ICICI Pru Nifty FMCG ETF", stuckInfo: "550 × 56.07" },
-    { symbol: "TMPV", name: "Tata Motors Passenger Vehicles", stuckInfo: "27 × 508.60" },
-    { symbol: "NSLNISP", name: "NMDC Steel", stuckInfo: "31 × 52.85" }
-];
-
-function loadStuckStockSettings() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(STUCK_STORAGE_KEY));
-        if (Array.isArray(saved)) return saved;
-    } catch (_) {}
-    return defaultStuckStocks.map(stock => ({ ...stock }));
-}
-
-let stuckStocks = loadStuckStockSettings();
+let stuckStocks = [];
 let editingStuckIndex = null;
 
-function saveStuckStockSettings() {
-    localStorage.setItem(STUCK_STORAGE_KEY, JSON.stringify(stuckStocks));
+async function loadStuckData(){
+  try { const r=await fetch('/api/data/stuck',{cache:'no-store'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to load'); stuckStocks=Array.isArray(d.items)?d.items:[]; }
+  catch(e){ stuckStocks=[]; alert('Stuck Stock data load nahi ho paya.'); }
+}
+async function saveStuckStockSettings(){
+  const r=await fetch('/api/data/stuck',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({items:stuckStocks})});
+  const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to save'); stuckStocks=d.items||stuckStocks;
 }
 
 function escapeStuckHtml(value) {
@@ -222,11 +207,13 @@ async function loadStuckStocks() {
 }
 
 function editStuck(index) {
+    if (!window.requireAdmin()) return;
     editingStuckIndex = index;
     loadStuckStocks();
 }
 
 function saveStuckEdit(index) {
+    if (!window.requireAdmin()) return;
     const input = document.getElementById(`stuckInfoInput${index}`);
     if (!input) return;
 
@@ -239,11 +226,11 @@ function saveStuckEdit(index) {
 
     stuckStocks[index].stuckInfo = value;
     editingStuckIndex = null;
-    saveStuckStockSettings();
-    loadStuckStocks();
+    saveStuckStockSettings().then(loadStuckStocks).catch(e=>alert(e.message||"Save failed"));
 }
 
 function cancelStuckEdit(event) {
+    if (!window.requireAdmin()) return;
     if (event) event.stopPropagation();
     editingStuckIndex = null;
     loadStuckStocks();
@@ -261,6 +248,7 @@ function handleStuckEditKey(event, index) {
 }
 
 function deleteStuck(index) {
+    if (!window.requireAdmin()) return;
     const stock = stuckStocks[index];
     if (!stock) return;
 
@@ -268,8 +256,7 @@ function deleteStuck(index) {
 
     stuckStocks.splice(index, 1);
     editingStuckIndex = null;
-    saveStuckStockSettings();
-    loadStuckStocks();
+    saveStuckStockSettings().then(loadStuckStocks).catch(e=>alert(e.message||"Delete failed"));
 }
 
-document.addEventListener("DOMContentLoaded", loadStuckStocks);
+document.addEventListener("DOMContentLoaded", async ()=>{ await loadStuckData(); await loadStuckStocks(); });

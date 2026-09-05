@@ -1,23 +1,11 @@
-const ALERT_STORAGE_KEY="stockHeavenAlerts";
-const defaultAlerts=[
- {symbol:"AWL",name:"AWL",alertPrice:""},
- {symbol:"ADANIENSOL",name:"ADANIENSOL",alertPrice:""},
- {symbol:"ADANIGREEN",name:"ADANIGREEN",alertPrice:""},
- {symbol:"NSLNISP",name:"NMDC Steel",alertPrice:""},
- {symbol:"TMPV",name:"TMPV",alertPrice:""},
- {symbol:"RELIANCE",name:"Reliance Industries",alertPrice:""},
- {symbol:"HDFCBANK",name:"HDFC Bank",alertPrice:""},
- {symbol:"TCS",name:"Tata Consultancy Services",alertPrice:""},
- {symbol:"INFY",name:"Infosys",alertPrice:""},
- {symbol:"HINDUNILVR",name:"Hindustan Unilever",alertPrice:""},
- {symbol:"ICICIBANK",name:"ICICI Bank",alertPrice:""},
- {symbol:"SBIN",name:"State Bank of India",alertPrice:""}
-];
+let alertStocks=[], prices={}, timer=null, editingAlerts=new Set();
 
-function loadAlerts(){try{const x=JSON.parse(localStorage.getItem(ALERT_STORAGE_KEY));if(Array.isArray(x))return x}catch(e){}return defaultAlerts}
-let alertStocks=loadAlerts(), prices={}, timer=null, editingAlerts=new Set();
-
-function saveAlerts(){localStorage.setItem(ALERT_STORAGE_KEY,JSON.stringify(alertStocks))}
+async function loadAlertData(){
+ try{const r=await fetch('/api/data/alerts',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load');alertStocks=Array.isArray(d.items)?d.items:[];}catch(e){alertStocks=[];alert('Alert data load nahi ho paya.');}
+}
+async function saveAlerts(){
+ const r=await fetch('/api/data/alerts',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({items:alertStocks})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to save');alertStocks=d.items||alertStocks;
+}
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function money(v){return Number.isFinite(Number(v))?"₹"+Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}):"--"}
 function initials(name){return String(name||"ST").replace(/[^A-Za-z0-9 ]/g,"").split(" ").filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase()}
@@ -67,20 +55,20 @@ function render(){
   </div>`;
  }).join("");
 }
-function setAlert(i,v){alertStocks[i].alertPrice=v;saveAlerts()}
-function editAlert(i){editingAlerts.clear();editingAlerts.add(i);render();requestAnimationFrame(()=>{const input=document.querySelector(`.alert-row .alert-input`);if(input){input.focus();input.select();}})}
-function saveAlertEdit(i){
+function setAlert(i,v){if(!window.requireAdmin())return;alertStocks[i].alertPrice=v;saveAlerts().catch(e=>alert(e.message||"Save failed"))}
+function editAlert(i){if(!window.requireAdmin())return;editingAlerts.clear();editingAlerts.add(i);render();requestAnimationFrame(()=>{const input=document.querySelector(`.alert-row .alert-input`);if(input){input.focus();input.select();}})}
+function saveAlertEdit(i){if(!window.requireAdmin())return;
  const input=document.querySelector(`.alert-row .alert-input`);
  if(input) alertStocks[i].alertPrice=input.value.trim();
- editingAlerts.delete(i);saveAlerts();render();
+ editingAlerts.delete(i);saveAlerts().then(render).catch(e=>alert(e.message||"Save failed"));
 }
 function cancelAlertEdit(i){editingAlerts.delete(i);render()}
 function handleAlertEditKey(event,i){
  if(event.key==="Enter"){event.preventDefault();saveAlertEdit(i)}
  if(event.key==="Escape"){event.preventDefault();cancelAlertEdit(i)}
 }
-function removeAlert(i){editingAlerts.delete(i);alertStocks.splice(i,1);delete prices[alertStocks[i]?.symbol];saveAlerts();render();refreshPrices()}
-function openAddStock(){document.getElementById("addStockPanel").classList.add("open");document.getElementById("addStockInput").focus()}
+function removeAlert(i){if(!window.requireAdmin())return;editingAlerts.delete(i);alertStocks.splice(i,1);saveAlerts().then(()=>{render();refreshPrices()}).catch(e=>alert(e.message||"Delete failed"));}
+function openAddStock(){if(!window.requireAdmin())return;document.getElementById("addStockPanel").classList.add("open");document.getElementById("addStockInput").focus()}
 function closeAddStock(){document.getElementById("addStockPanel").classList.remove("open");document.getElementById("addStockInput").value="";document.getElementById("recommendations").innerHTML=""}
 
 function renderRecommendations(data){
@@ -99,9 +87,9 @@ async function searchStocks(q){
  }catch(e){document.getElementById("recommendations").innerHTML="";}
 
 }
-function addRecommended(symbol,name){
+function addRecommended(symbol,name){if(!window.requireAdmin())return;
  if(alertStocks.some(x=>x.symbol===symbol)){closeAddStock();return}
- alertStocks.push({symbol,name,alertPrice:""});saveAlerts();render();closeAddStock();refreshPrices();
+ alertStocks.push({symbol,name,alertPrice:""});saveAlerts().then(()=>{render();closeAddStock();refreshPrices()}).catch(e=>alert(e.message||"Save failed"));
 }
 async function getPrice(symbol){
  const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
@@ -116,8 +104,8 @@ async function refreshPrices(){
  const u=document.getElementById("showingText"); if(u)u.title="Prices refresh automatically every 60 seconds";
 }
 
-document.addEventListener("DOMContentLoaded",()=>{
- render();refreshPrices();timer=setInterval(refreshPrices,60000);
+document.addEventListener("DOMContentLoaded",async()=>{
+ await loadAlertData(); render();refreshPrices();timer=setInterval(refreshPrices,60000);
  document.getElementById("tableSearch").addEventListener("input",render);
  document.getElementById("stockFilter").addEventListener("change",render);
  document.getElementById("rowsPerPage").addEventListener("change",render);

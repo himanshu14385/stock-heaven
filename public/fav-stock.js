@@ -1,4 +1,3 @@
-const FAV_STORAGE_KEY = "stockHeavenFavoriteGroups";
 const fallbackStocks = [
   ["RELIANCE", "Reliance Industries Limited"], ["TCS", "Tata Consultancy Services Limited"],
   ["HDFCBANK", "HDFC Bank Limited"], ["INFY", "Infosys Limited"], ["ICICIBANK", "ICICI Bank Limited"],
@@ -14,7 +13,7 @@ const fallbackStocks = [
   ["NSLNISP", "NMDC Steel"], ["TMPV", "Tata Motors Passenger Vehicles"]
 ];
 
-let groups = loadGroups();
+let groups = [];
 let modalMode = "add";
 let editingGroupId = null;
 let activeGroupId = null;
@@ -26,11 +25,12 @@ function uid(){ return "g" + Date.now().toString(36) + Math.random().toString(36
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function symbolClean(v){ return String(v||"").trim().toUpperCase(); }
 function displaySymbol(v){ return symbolClean(v).replace(/\.NS$/i,""); }
-function loadGroups(){
-  try { const x=JSON.parse(localStorage.getItem(FAV_STORAGE_KEY)); if(Array.isArray(x)) return x; } catch(e){}
-  return [];
+async function loadGroups(){
+  const r=await fetch('/api/data/favorites',{cache:'no-store'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to load favorites'); groups=Array.isArray(d.groups)?d.groups:[];
 }
-function saveGroups(){ localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(groups)); }
+async function saveGroups(){
+  const r=await fetch('/api/data/favorites',{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({groups})}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Unable to save favorites'); groups=Array.isArray(d.groups)?d.groups:groups;
+}
 function formatPrice(v){ return Number.isFinite(Number(v)) ? `₹${Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}` : "--"; }
 function formatChange(v,p){
   if(!Number.isFinite(Number(v))) return "--";
@@ -69,38 +69,38 @@ function render(){
   }).join("");
 }
 
-function openCardModal(){
+function openCardModal(){if(!window.requireAdmin())return;
   modalMode="add"; editingGroupId=null;
   document.getElementById("modalTitle").textContent="Add Card";
   document.getElementById("cardTitleInput").value="";
   showModal("cardModal");
   setTimeout(()=>document.getElementById("cardTitleInput").focus(),50);
 }
-function openEditCard(id){
+function openEditCard(id){if(!window.requireAdmin())return;
   const g=groups.find(x=>x.id===id); if(!g)return;
   modalMode="edit"; editingGroupId=id;
   document.getElementById("modalTitle").textContent="Edit Card";
   document.getElementById("cardTitleInput").value=g.title;
   showModal("cardModal"); setTimeout(()=>{const x=document.getElementById("cardTitleInput");x.focus();x.select();},50);
 }
-function saveCard(){
+function saveCard(){if(!window.requireAdmin())return;
   const title=document.getElementById("cardTitleInput").value.trim();
   if(!title){ alert("Card title enter karo"); return; }
   if(modalMode==="edit") { const g=groups.find(x=>x.id===editingGroupId); if(g)g.title=title; }
-  else groups.push({id:uid(),title,stocks:[]});
-  saveGroups(); closeCardModal(); render();
+  else groups.push({id:null,title,stocks:[]});
+  saveGroups().then(()=>{closeCardModal();render();}).catch(e=>alert(e.message||"Save failed"));
 }
-function deleteCard(id){
+function deleteCard(id){if(!window.requireAdmin())return;
   const g=groups.find(x=>x.id===id); if(!g)return;
   if(!confirm(`"${g.title}" card delete karna hai?`))return;
-  groups=groups.filter(x=>x.id!==id); saveGroups(); render();
+  groups=groups.filter(x=>x.id!==id); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed"));
 }
 function cardTitleKey(e){ if(e.key==="Enter"){e.preventDefault();saveCard();} if(e.key==="Escape")closeCardModal(); }
 function showModal(id){const x=document.getElementById(id);x.classList.add("open");x.setAttribute("aria-hidden","false");}
 function hideModal(id){const x=document.getElementById(id);x.classList.remove("open");x.setAttribute("aria-hidden","true");}
 function closeCardModal(){hideModal("cardModal");}
 
-function openStockModal(groupId){
+function openStockModal(groupId){if(!window.requireAdmin())return;
   activeGroupId=groupId; const g=groups.find(x=>x.id===groupId); if(!g)return;
   document.getElementById("stockModalSubtitle").textContent=`Add a stock to ${g.title}`;
   document.getElementById("favStockInput").value="";
@@ -123,14 +123,14 @@ function searchFavStocks(){
   const id=++searchRequest; searchTimer=setTimeout(async()=>{const list=await searchRemote(q); if(id===searchRequest)renderSuggestions(list);},250);
 }
 function favStockKey(e){ if(e.key==="Escape")closeStockModal(); if(e.key==="Enter"){e.preventDefault(); const first=document.querySelector(".fav-suggestion"); if(first)first.click(); else addManualStock();} }
-function addStock(symbol,name){
+function addStock(symbol,name){if(!window.requireAdmin())return;
   const g=groups.find(x=>x.id===activeGroupId); if(!g)return;
   const clean=symbolClean(symbol); if(!clean)return;
   if((g.stocks||[]).some(s=>symbolClean(s.symbol)===clean)){alert("Ye stock is card me already added hai");return;}
-  g.stocks=g.stocks||[]; g.stocks.push({symbol:clean,name:name||clean}); saveGroups(); closeStockModal(); render(); fetchPrice(clean);
+  g.stocks=g.stocks||[]; g.stocks.push({id:null,symbol:clean,name:name||clean,note:""}); saveGroups().then(()=>{closeStockModal();render();fetchPrice(clean)}).catch(e=>alert(e.message||"Save failed"));
 }
-function addManualStock(){ const q=symbolClean(document.getElementById("favStockInput").value); if(!q){alert("Stock symbol enter karo");return;} addStock(q,q); }
-function removeStock(groupId,index){ const g=groups.find(x=>x.id===groupId); if(!g)return; g.stocks.splice(index,1); saveGroups(); render(); }
+function addManualStock(){if(!window.requireAdmin())return; const q=symbolClean(document.getElementById("favStockInput").value); if(!q){alert("Stock symbol enter karo");return;} addStock(q,q); }
+function removeStock(groupId,index){if(!window.requireAdmin())return; const g=groups.find(x=>x.id===groupId); if(!g)return; g.stocks.splice(index,1); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed")); }
 async function fetchPrice(symbol, force=false){
   if(!force && prices[symbol]) return;
   try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`, {cache:"no-store"}); const d=await r.json(); if(r.ok&&!d.error){prices[symbol]={price:Number(d.price),change:Number(d.change),percent_change:Number(d.percent_change),as_of:d.as_of||null}; render();}}catch(e){}
@@ -140,25 +140,25 @@ async function refreshPrices(){
   await Promise.all(symbols.map(s=>fetchPrice(s,true)));
 }
 let draggedStock=null;
-function dragStock(event,groupId,index){ draggedStock={groupId,index}; event.dataTransfer.effectAllowed="move"; event.dataTransfer.setData("text/plain", `${groupId}:${index}`); event.currentTarget.classList.add("dragging"); }
+function dragStock(event,groupId,index){if(!window.requireAdmin())return; draggedStock={groupId,index}; event.dataTransfer.effectAllowed="move"; event.dataTransfer.setData("text/plain", `${groupId}:${index}`); event.currentTarget.classList.add("dragging"); }
 function allowStockDrop(event){ event.preventDefault(); event.dataTransfer.dropEffect="move"; }
-function dropStock(event,groupId,targetIndex){
+function dropStock(event,groupId,targetIndex){if(!window.requireAdmin())return;
   event.preventDefault();
   if(!draggedStock || draggedStock.groupId!==groupId) return;
   const g=groups.find(x=>x.id===groupId); if(!g) return;
   const from=draggedStock.index; if(from===targetIndex) return;
   const [item]=g.stocks.splice(from,1);
   g.stocks.splice(from<targetIndex?targetIndex-1:targetIndex,0,item);
-  draggedStock=null; saveGroups(); render();
+  draggedStock=null; saveGroups().then(render).catch(e=>alert(e.message||"Reorder failed"));
 }
 document.addEventListener("dragend",()=>{document.querySelectorAll(".fav-stock-row.dragging").forEach(x=>x.classList.remove("dragging")); draggedStock=null;});
-function toggleCard(id){ const g=groups.find(x=>x.id===id); if(!g)return; g.collapsed=!g.collapsed; saveGroups(); render(); }
-function editStockNote(groupId,index){
+function toggleCard(id){ const g=groups.find(x=>x.id===id); if(!g)return; g.collapsed=!g.collapsed; saveGroups().then(render).catch(e=>alert(e.message||"Save failed")); }
+function editStockNote(groupId,index){if(!window.requireAdmin())return;
   const g=groups.find(x=>x.id===groupId); if(!g||!g.stocks[index])return;
   const current=String(g.stocks[index].note||"");
   const note=prompt("Stock note enter kijiye (blank chhodne par note remove ho jayega):", current);
   if(note===null)return;
-  g.stocks[index].note=note.trim(); saveGroups(); render();
+  g.stocks[index].note=note.trim(); saveGroups().then(render).catch(e=>alert(e.message||"Save failed"));
 }
-render(); refreshPrices();
+document.addEventListener("DOMContentLoaded",async()=>{ try{await loadGroups();render();await refreshPrices();}catch(e){alert(e.message||"Favourite data load nahi ho paya.");render();} });
 setInterval(refreshPrices,60000);
