@@ -354,6 +354,16 @@ async function passwordHash(password,saltB64){
   return {salt:bytesToB64(salt),hash:bytesToB64(new Uint8Array(bits))};
 }
 async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);return x.hash===hash;}
+let favoriteSchemaReady = null;
+async function ensureFavoriteSchema(env){
+  if(favoriteSchemaReady)return favoriteSchemaReady;
+  favoriteSchemaReady=(async()=>{
+    const info=await env.AUTH_DB.prepare(`PRAGMA table_info(favorite_groups)`).all();
+    const cols=new Set((info.results||[]).map(x=>x.name));
+    if(!cols.has('identity')) await env.AUTH_DB.prepare(`ALTER TABLE favorite_groups ADD COLUMN identity TEXT NOT NULL DEFAULT 'favourite'`).run();
+  })().catch(e=>{favoriteSchemaReady=null;throw e;});
+  return favoriteSchemaReady;
+}
 async function authInit(env){
   if(!env.AUTH_DB) throw new Error("AUTH_DB binding missing");
   const db=env.AUTH_DB;
@@ -489,15 +499,17 @@ async function replaceAlertsData(env,items){
   await env.AUTH_DB.batch(stm);
 }
 async function getFavoritesData(env){
-  const gr=await env.AUTH_DB.prepare(`SELECT id,title,sort_order,collapsed FROM favorite_groups ORDER BY sort_order,id`).all();
+  await ensureFavoriteSchema(env);
+  const gr=await env.AUTH_DB.prepare(`SELECT id,title,identity,sort_order,collapsed FROM favorite_groups ORDER BY sort_order,id`).all();
   const sr=await env.AUTH_DB.prepare(`SELECT id,group_id,symbol,name,note,sort_order FROM favorite_stocks ORDER BY group_id,sort_order,id`).all();
   const stocks=sr.results||[];
-  return (gr.results||[]).map(g=>({id:g.id,title:g.title,collapsed:!!g.collapsed,stocks:stocks.filter(s=>s.group_id===g.id).map(s=>({id:s.id,symbol:s.symbol,name:s.name||s.symbol,note:s.note||""}))}));
+  return (gr.results||[]).map(g=>({id:g.id,title:g.title,identity:g.identity||'favourite',collapsed:!!g.collapsed,stocks:stocks.filter(s=>s.group_id===g.id).map(s=>({id:s.id,symbol:s.symbol,name:s.name||s.symbol,note:s.note||""}))}));
 }
 async function replaceFavoritesData(env,groups){
+  await ensureFavoriteSchema(env);
   const gs=Array.isArray(groups)?groups:[];
   const stm=[env.AUTH_DB.prepare(`DELETE FROM favorite_stocks`),env.AUTH_DB.prepare(`DELETE FROM favorite_groups`)];
-  gs.forEach((g,i)=>{const title=String(g.title||"").trim();if(title)stm.push(env.AUTH_DB.prepare(`INSERT INTO favorite_groups(title,sort_order,collapsed) VALUES (?,?,?)`).bind(title,i,g.collapsed?1:0));});
+  gs.forEach((g,i)=>{const title=String(g.title||"").trim();if(title)stm.push(env.AUTH_DB.prepare(`INSERT INTO favorite_groups(title,sort_order,collapsed,identity) VALUES (?,?,?,?)`).bind(title,i,g.collapsed?1:0,String(g.identity||g.icon_key||'favourite')));});
   await env.AUTH_DB.batch(stm);
   const fresh=await env.AUTH_DB.prepare(`SELECT id,sort_order FROM favorite_groups ORDER BY sort_order,id`).all();
   const ins=[];
