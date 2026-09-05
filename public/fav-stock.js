@@ -57,7 +57,7 @@ function render(){
         <div class="fav-drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
         <div class="fav-stock-main"><div class="fav-logo">${esc(initials(s.name||s.symbol))}</div><div class="fav-stock-copy"><b>${esc(s.name||s.symbol)}</b><small>${esc(displaySymbol(s.symbol))}</small>${note?`<span class="fav-stock-note"><i class="fa-regular fa-note-sticky"></i> ${esc(note)}</span>`:""}</div></div>
         <div class="fav-stock-market"><strong>${formatPrice(p.price)}</strong><span class="${cls}">${formatChange(ch,pc)}</span></div>
-        <div class="fav-stock-actions"><button class="fav-note-stock" type="button" title="${note?"Edit note":"Add note"}" onclick="event.stopPropagation();editStockNote('${g.id}',${idx})"><i class="fa-regular fa-note-sticky"></i></button><button class="fav-remove-stock" type="button" title="Remove stock" onclick="event.stopPropagation();removeStock('${g.id}',${idx})"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="fav-stock-actions"><button class="fav-move-stock" type="button" title="Move up" ${idx===0?'disabled':''} onclick="event.stopPropagation();moveStock('${g.id}',${idx},-1)"><i class="fa-solid fa-chevron-up"></i></button><button class="fav-move-stock" type="button" title="Move down" ${(idx===(g.stocks||[]).length-1)?'disabled':''} onclick="event.stopPropagation();moveStock('${g.id}',${idx},1)"><i class="fa-solid fa-chevron-down"></i></button><button class="fav-note-stock" type="button" title="${note?"Edit note":"Add note"}" onclick="event.stopPropagation();editStockNote('${g.id}',${idx})"><i class="fa-regular fa-note-sticky"></i></button><button class="fav-remove-stock" type="button" title="Remove stock" onclick="event.stopPropagation();removeStock('${g.id}',${idx})"><i class="fa-solid fa-xmark"></i></button></div>
       </div>`;
     }).join("");
     return `<article class="fav-card ${collapsed?"is-collapsed":""}">
@@ -77,7 +77,7 @@ function openCardModal(){if(!window.requireAdmin())return;
   setTimeout(()=>document.getElementById("cardTitleInput").focus(),50);
 }
 function openEditCard(id){if(!window.requireAdmin())return;
-  const g=groups.find(x=>x.id===id); if(!g)return;
+  const g=groups.find(x=>String(x.id)===String(id)); if(!g)return;
   modalMode="edit"; editingGroupId=id;
   document.getElementById("modalTitle").textContent="Edit Card";
   document.getElementById("cardTitleInput").value=g.title;
@@ -86,14 +86,14 @@ function openEditCard(id){if(!window.requireAdmin())return;
 function saveCard(){if(!window.requireAdmin())return;
   const title=document.getElementById("cardTitleInput").value.trim();
   if(!title){ alert("Card title enter karo"); return; }
-  if(modalMode==="edit") { const g=groups.find(x=>x.id===editingGroupId); if(g)g.title=title; }
+  if(modalMode==="edit") { const g=groups.find(x=>String(x.id)===String(editingGroupId)); if(g)g.title=title; }
   else groups.push({id:null,title,stocks:[]});
   saveGroups().then(()=>{closeCardModal();render();}).catch(e=>alert(e.message||"Save failed"));
 }
 function deleteCard(id){if(!window.requireAdmin())return;
-  const g=groups.find(x=>x.id===id); if(!g)return;
+  const g=groups.find(x=>String(x.id)===String(id)); if(!g)return;
   if(!confirm(`"${g.title}" card delete karna hai?`))return;
-  groups=groups.filter(x=>x.id!==id); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed"));
+  groups=groups.filter(x=>String(x.id)!==String(id)); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed"));
 }
 function cardTitleKey(e){ if(e.key==="Enter"){e.preventDefault();saveCard();} if(e.key==="Escape")closeCardModal(); }
 function showModal(id){const x=document.getElementById(id);x.classList.add("open");x.setAttribute("aria-hidden","false");}
@@ -101,7 +101,7 @@ function hideModal(id){const x=document.getElementById(id);x.classList.remove("o
 function closeCardModal(){hideModal("cardModal");}
 
 function openStockModal(groupId){if(!window.requireAdmin())return;
-  activeGroupId=groupId; const g=groups.find(x=>x.id===groupId); if(!g)return;
+  activeGroupId=groupId; const g=groups.find(x=>String(x.id)===String(groupId)); if(!g)return;
   document.getElementById("stockModalSubtitle").textContent=`Add a stock to ${g.title}`;
   document.getElementById("favStockInput").value="";
   document.getElementById("favSuggestions").innerHTML="";
@@ -160,7 +160,19 @@ function addManualStock(){
   if(!q){alert("Stock symbol enter karo");return;}
   addStock(q,q);
 }
-function removeStock(groupId,index){if(!window.requireAdmin())return; const g=groups.find(x=>x.id===groupId); if(!g)return; g.stocks.splice(index,1); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed")); }
+
+async function moveStock(groupId,index,direction){
+  if(!window.requireAdmin())return;
+  const g=groups.find(x=>String(x.id)===String(groupId));
+  if(!g||!Array.isArray(g.stocks))return;
+  const to=index+direction;
+  if(index<0||to<0||to>=g.stocks.length)return;
+  const copy=g.stocks.slice();
+  [copy[index],copy[to]]=[copy[to],copy[index]];
+  g.stocks=copy;
+  try{await saveGroups();render();}catch(e){alert(e.message||"Reorder failed");await loadGroups().catch(()=>{});render();}
+}
+function removeStock(groupId,index){if(!window.requireAdmin())return; const g=groups.find(x=>String(x.id)===String(groupId)); if(!g)return; g.stocks.splice(index,1); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed")); }
 async function fetchPrice(symbol, force=false){
   if(!force && prices[symbol]) return;
   try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}&t=${Date.now()}`, {cache:"no-store"}); const d=await r.json(); if(r.ok&&!d.error){prices[symbol]={price:Number(d.price),change:Number(d.change),percent_change:Number(d.percent_change),as_of:d.as_of||null}; render();}}catch(e){}
@@ -174,17 +186,17 @@ function dragStock(event,groupId,index){if(!window.requireAdmin())return; dragge
 function allowStockDrop(event){ event.preventDefault(); event.dataTransfer.dropEffect="move"; }
 function dropStock(event,groupId,targetIndex){if(!window.requireAdmin())return;
   event.preventDefault();
-  if(!draggedStock || draggedStock.groupId!==groupId) return;
-  const g=groups.find(x=>x.id===groupId); if(!g) return;
+  if(!draggedStock || String(draggedStock.groupId)!==String(groupId)) return;
+  const g=groups.find(x=>String(x.id)===String(groupId)); if(!g) return;
   const from=draggedStock.index; if(from===targetIndex) return;
   const [item]=g.stocks.splice(from,1);
   g.stocks.splice(from<targetIndex?targetIndex-1:targetIndex,0,item);
   draggedStock=null; saveGroups().then(render).catch(e=>alert(e.message||"Reorder failed"));
 }
 document.addEventListener("dragend",()=>{document.querySelectorAll(".fav-stock-row.dragging").forEach(x=>x.classList.remove("dragging")); draggedStock=null;});
-function toggleCard(id){ const g=groups.find(x=>x.id===id); if(!g)return; g.collapsed=!g.collapsed; saveGroups().then(render).catch(e=>alert(e.message||"Save failed")); }
+function toggleCard(id){ const g=groups.find(x=>String(x.id)===String(id)); if(!g)return; g.collapsed=!g.collapsed; saveGroups().then(render).catch(e=>alert(e.message||"Save failed")); }
 function editStockNote(groupId,index){if(!window.requireAdmin())return;
-  const g=groups.find(x=>x.id===groupId); if(!g||!g.stocks[index])return;
+  const g=groups.find(x=>String(x.id)===String(groupId)); if(!g||!g.stocks[index])return;
   const current=String(g.stocks[index].note||"");
   const note=prompt("Stock note enter kijiye (blank chhodne par note remove ho jayega):", current);
   if(note===null)return;
