@@ -171,6 +171,55 @@ function marketQuote(q) {
   };
 }
 
+
+async function fetchEquityPanditQuote(symbol) {
+  const clean = String(symbol || "").trim().toLowerCase().replace(/\.ns$/i, "");
+  if (!clean) return null;
+  try {
+    const html = await fetchText(`https://www.equitypandit.com/historical-data/${encodeURIComponent(clean)}`);
+    if (!html) return null;
+
+    const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+      .map(m => [...m[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(x => stripTags(x[1])))
+      .filter(cells => cells.length >= 6);
+
+    const dateRe = /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/;
+    const parsed = [];
+    for (const cells of rows) {
+      const dateText = String(cells[0] || "").trim();
+      if (!dateRe.test(dateText)) continue;
+      const price = num(cells[1]);
+      const open = num(cells[2]);
+      const high = num(cells[3]);
+      const low = num(cells[4]);
+      const volume = num(cells[5]);
+      if ([price, open, high, low].some(v => v == null)) continue;
+      parsed.push({ date: dateText, price, open, high, low, volume });
+      if (parsed.length >= 2) break;
+    }
+    if (!parsed.length) return null;
+
+    const latest = parsed[0];
+    const previous = parsed[1] || latest;
+    const change = latest.price - previous.price;
+    const percentChange = previous.price ? (change / previous.price) * 100 : 0;
+    return {
+      price: latest.price,
+      previous_close: previous.price,
+      change,
+      percent_change: percentChange,
+      day_open: latest.open,
+      day_high: latest.high,
+      day_low: latest.low,
+      volume: latest.volume,
+      as_of: latest.date,
+      price_source: "EquityPandit NSE historical data",
+      ohlc_source: "EquityPandit NSE historical data",
+      previous_date: previous.date
+    };
+  } catch (_) { return null; }
+}
+
 async function fetchSelectedPE(symbol) {
   const clean = String(symbol || "").trim().toUpperCase().replace(/\.NS$/i, "");
   try {
@@ -266,50 +315,67 @@ export default {
       if (!rawSymbol) return json({ error: "Stock symbol missing" }, 400);
       const symbol = rawSymbol.endsWith(".NS") ? rawSymbol.slice(0, -3) : rawSymbol;
       const yahooSymbol = `${symbol}.NS`;
+
+      // NSE historical data from EquityPandit is the primary source for the
+      // displayed price/OHLC. This avoids Yahoo's occasional stale ETF candle
+      // problem where the API can return the previous trading session.
+      const ep = await fetchEquityPanditQuote(symbol);
+      if (ep) {
+        return json({
+          symbol,
+          yahoo_symbol: yahooSymbol,
+          exchange: "NSE",
+          currency: "INR",
+          ...ep
+        });
+      }
+
+      // Fallback only when the NSE historical source is unavailable.
       const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1y&interval=1d&events=div%2Csplits`;
       try {
-        const response = await fetch(yahooUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+        const response = await fetch(yahooUrl, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          cache: "no-store"
+        });
         if (!response.ok) return json({ error: "Stock data request failed", status: response.status }, 502);
         const body = await response.json();
         const result = body?.chart?.result?.[0];
         if (!result) return json({ error: "Stock not found" }, 404);
         const timestamps = result.timestamp || [];
         const quote = result.indicators?.quote?.[0] || {};
-        const history = timestamps.map((time, i) => ({ time, open: quote.open?.[i] ?? null, high: quote.high?.[i] ?? null, low: quote.low?.[i] ?? null, close: quote.close?.[i] ?? null, volume: quote.volume?.[i] ?? null })).filter(item => item.close !== null);
+        const history = timestamps.map((time, i) => ({
+          time,
+          open: quote.open?.[i] ?? null,
+          high: quote.high?.[i] ?? null,
+          low: quote.low?.[i] ?? null,
+          close: quote.close?.[i] ?? null,
+          volume: quote.volume?.[i] ?? null
+        })).filter(item => item.close !== null);
         if (!history.length) return json({ error: "No price history found" }, 404);
         const last = history[history.length - 1];
         const previous = history.length > 1 ? history[history.length - 2] : last;
-        const meta = result.meta || {};
-
-        // Use the latest daily NSE candle as the source of truth for the displayed
-        // close and for the previous-close comparison. Yahoo's meta.previousClose
-        // can occasionally be stale/mismatched for ETFs, which caused values such
-        // as NIFTYCASE 9.64 vs 9.77 and TATAGOLD 14.94 vs an old close.
-        // During an active session, regularMarketPrice can be newer than the daily
-        // candle, so use it only when Yahoo explicitly reports the market as open.
-        const marketPrice = Number(meta.regularMarketPrice);
-        const marketState = String(meta.marketState || meta.currentTradingPeriod?.regular?.status || "").toLowerCase();
-        const marketIsOpen = marketState === "open";
-        const price = marketIsOpen && Number.isFinite(marketPrice) ? marketPrice : last.close;
-
-        // Previous close must be the immediately preceding valid daily NSE close,
-        // not meta.previousClose/chartPreviousClose.
-        const previousClose = previous.close;
-
-        // For the daily display, take OHLC/volume from the same latest candle as
-        // the displayed close so all values belong to one trading session. During
-        // an active session, Yahoo's live session OHLC can be used.
-        const metaOpen = Number(meta.regularMarketOpen);
-        const metaHigh = Number(meta.regularMarketDayHigh);
-        const metaLow = Number(meta.regularMarketDayLow);
-        const metaVolume = Number(meta.regularMarketVolume);
-        const dayOpen = marketIsOpen && Number.isFinite(metaOpen) ? metaOpen : last.open;
-        const dayHigh = marketIsOpen && Number.isFinite(metaHigh) ? metaHigh : last.high;
-        const dayLow = marketIsOpen && Number.isFinite(metaLow) ? metaLow : last.low;
-        const dayVolume = marketIsOpen && Number.isFinite(metaVolume) ? metaVolume : last.volume;
-        const change = price - previousClose;
-        const percentChange = previousClose !== 0 ? (change / previousClose) * 100 : 0;
-        return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", price, previous_close: previousClose, change, percent_change: percentChange, day_open: dayOpen, day_high: dayHigh, day_low: dayLow, volume: dayVolume, year_high: meta.fiftyTwoWeekHigh ?? null, year_low: meta.fiftyTwoWeekLow ?? null, currency: meta.currency || "INR", as_of: meta.regularMarketTime ?? null, price_source: marketIsOpen && Number.isFinite(marketPrice) ? "Yahoo Finance live market price" : "Yahoo Finance latest daily close", ohlc_source: marketIsOpen && (Number.isFinite(metaOpen) || Number.isFinite(metaHigh) || Number.isFinite(metaLow)) ? "Yahoo Finance live session data" : "Yahoo Finance latest daily candle", history });
+        const change = last.close - previous.close;
+        const percentChange = previous.close ? (change / previous.close) * 100 : 0;
+        return json({
+          symbol,
+          yahoo_symbol: yahooSymbol,
+          exchange: "NSE",
+          price: last.close,
+          previous_close: previous.close,
+          change,
+          percent_change: percentChange,
+          day_open: last.open,
+          day_high: last.high,
+          day_low: last.low,
+          volume: last.volume,
+          year_high: result.meta?.fiftyTwoWeekHigh ?? null,
+          year_low: result.meta?.fiftyTwoWeekLow ?? null,
+          currency: result.meta?.currency || "INR",
+          as_of: last.time,
+          price_source: "Yahoo Finance daily fallback",
+          ohlc_source: "Yahoo Finance daily fallback",
+          history
+        });
       } catch (_) { return json({ error: "Unable to fetch stock data" }, 500); }
     }
     return env.ASSETS.fetch(request);
