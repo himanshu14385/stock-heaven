@@ -230,6 +230,34 @@ async function fetchSelectedPE(symbol) {
     return m ? num(m[1]) : null;
   } catch (_) { return null; }
 }
+const SERVER_PEER_FALLBACKS = {
+  RELIANCE:[['ONGC','Oil & Natural Gas Corporation'],['IOC','Indian Oil Corporation'],['BPCL','Bharat Petroleum Corporation'],['HINDPETRO','Hindustan Petroleum Corporation'],['MRPL','Mangalore Refinery & Petroleum'],['CHENNPETRO','Chennai Petroleum Corporation'],['GAIL','GAIL (India) Limited']],
+  TCS:[['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['MPHASIS','Mphasis'],['COFORGE','Coforge']],
+  INFY:[['TCS','Tata Consultancy Services'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra'],['LTIM','LTIMindtree'],['MPHASIS','Mphasis'],['COFORGE','Coforge']],
+  HDFCBANK:[['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank']],
+  ICICIBANK:[['HDFCBANK','HDFC Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank']],
+  SBIN:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['BANKBARODA','Bank of Baroda'],['PNB','Punjab National Bank'],['CANBK','Canara Bank']],
+  ITC:[['HINDUNILVR','Hindustan Unilever'],['NESTLEIND','Nestle India'],['BRITANNIA','Britannia Industries'],['GODREJCP','Godrej Consumer Products'],['MARICO','Marico'],['DABUR','Dabur India']],
+  BHARTIARTL:[['TATACOMM','Tata Communications'],['INDUSTOWER','Indus Towers'],['IDEA','Vodafone Idea'],['RCOM','Reliance Communications'],['JIOFIN','Jio Financial Services']],
+  AWL:[['DABUR','Dabur India'],['GODREJCP','Godrej Consumer Products'],['EMAMILTD','Emami'],['MARICO','Marico'],['HINDUNILVR','Hindustan Unilever'],['ITC','ITC Limited']],
+  ADANIENSOL:[['ADANIGREEN','Adani Green Energy'],['NTPC','NTPC'],['POWERGRID','Power Grid Corporation'],['TATAPOWER','Tata Power'],['JSWENERGY','JSW Energy'],['ADANIPOWER','Adani Power']],
+  ADANIGREEN:[['ADANIPOWER','Adani Power'],['NTPC','NTPC'],['POWERGRID','Power Grid Corporation'],['TATAPOWER','Tata Power'],['JSWENERGY','JSW Energy'],['RPOWER','Reliance Power']],
+  NSLNISP:[['JINDALSTEL','Jindal Steel & Power'],['SAIL','Steel Authority of India'],['TATASTEEL','Tata Steel'],['JSWSTEEL','JSW Steel'],['HINDALCO','Hindalco Industries'],['NMDC','NMDC']],
+  TMPV:[['MARUTI','Maruti Suzuki India'],['M&M','Mahindra & Mahindra'],['EICHERMOT','Eicher Motors'],['HEROMOTOCO','Hero MotoCorp'],['BAJAJ-AUTO','Bajaj Auto']],
+  HINDUNILVR:[['ITC','ITC Limited'],['NESTLEIND','Nestle India'],['BRITANNIA','Britannia Industries'],['GODREJCP','Godrej Consumer Products'],['MARICO','Marico'],['DABUR','Dabur India']],
+  AXISBANK:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['KOTAKBANK','Kotak Mahindra Bank'],['INDUSINDBK','IndusInd Bank']],
+  KOTAKBANK:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['INDUSINDBK','IndusInd Bank']],
+  TATAGOLD:[['GOLDBEES','Nippon India ETF Gold BeES']],
+  GOLDBEES:[['TATAGOLD','Tata Gold Exchange Traded Fund']],
+  ITBEES:[['TCS','Tata Consultancy Services'],['INFY','Infosys Limited'],['HCLTECH','HCL Technologies'],['WIPRO','Wipro Limited'],['TECHM','Tech Mahindra']],
+  BANKBEES:[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank']]
+};
+function serverFallbackPeers(symbol){
+  const key=String(symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
+  const list=SERVER_PEER_FALLBACKS[key]||[['HDFCBANK','HDFC Bank'],['ICICIBANK','ICICI Bank'],['SBIN','State Bank of India'],['AXISBANK','Axis Bank'],['KOTAKBANK','Kotak Mahindra Bank'],['ITC','ITC Limited'],['TCS','Tata Consultancy Services']];
+  return list.map(([symbol,name])=>({symbol,name,ltp:null,pe:null,rsi:null}));
+}
+
 async function fetchDynamicPeers(symbol) {
   const company = await resolveCompany(symbol);
   if (!company) return null;
@@ -252,12 +280,233 @@ async function fetchDynamicPeers(symbol) {
       return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", selected, peers: peers.slice(0, 10) };
     }
   }
-  return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison", peers: [] };
+  return { symbol: company.symbol, name: company.name, source: "ScanX peer comparison + fallback", peers: serverFallbackPeers(company.symbol) };
+}
+
+
+const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","admin.html"]);
+const DEFAULT_GUEST_USERNAME = "guest";
+const DEFAULT_GUEST_PASSWORD = "Guest@2026";
+const ADMIN_FALLBACK_USERNAME = "admin";
+const ADMIN_FALLBACK_PASSWORD = "StockHeaven@2026";
+const GUEST_SESSION_SECONDS = 5 * 60;
+const ADMIN_SESSION_SECONDS = 10 * 365 * 24 * 60 * 60;
+
+function authCookie(token, maxAge) {
+  return `__Host-stock_heaven_session=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+}
+function clearAuthCookie(){ return "__Host-stock_heaven_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"; }
+function getCookie(request,name){
+  const raw=request.headers.get("Cookie")||"";
+  for(const part of raw.split(";")){const [k,...v]=part.trim().split("=");if(k===name)return v.join("=");}
+  return null;
+}
+function nowIso(){return new Date().toISOString();}
+function bytesToB64(bytes){let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");}
+function b64ToBytes(s){const x=s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4);const bin=atob(x);return Uint8Array.from(bin,c=>c.charCodeAt(0));}
+async function randomSecret(){return bytesToB64(crypto.getRandomValues(new Uint8Array(32)));}
+async function sha256(text){const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));return bytesToB64(new Uint8Array(buf));}
+async function passwordHash(password,saltB64){
+  const salt=saltB64?b64ToBytes(saltB64):crypto.getRandomValues(new Uint8Array(16));
+  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:120000,hash:"SHA-256"},key,256);
+  return {salt:bytesToB64(salt),hash:bytesToB64(new Uint8Array(bits))};
+}
+async function verifyPassword(password,hash,salt){const x=await passwordHash(password,salt);return x.hash===hash;}
+async function authInit(env){
+  if(!env.AUTH_DB) throw new Error("AUTH_DB binding missing");
+  const db=env.AUTH_DB;
+  await db.prepare(`CREATE TABLE IF NOT EXISTS auth_settings (id INTEGER PRIMARY KEY CHECK (id=1),guest_username TEXT NOT NULL,guest_password_hash TEXT NOT NULL,guest_password_salt TEXT NOT NULL,guest_version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS auth_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT,token_hash TEXT NOT NULL UNIQUE,role TEXT NOT NULL CHECK(role IN ('admin','guest')),username TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions(token_hash)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS auth_restrictions (page TEXT PRIMARY KEY,restricted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
+  try { await db.prepare(`ALTER TABLE stuck_stocks ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
+  try { await db.prepare(`ALTER TABLE alerts ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
+  try { await db.prepare(`ALTER TABLE favorite_stocks ADD COLUMN name TEXT NOT NULL DEFAULT ''`).run(); } catch (_) {}
+  const row=await db.prepare(`SELECT id FROM auth_settings WHERE id=1`).first();
+  if(!row){const hp=await passwordHash(env.DEFAULT_GUEST_PASSWORD||DEFAULT_GUEST_PASSWORD);await db.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(env.DEFAULT_GUEST_USERNAME||DEFAULT_GUEST_USERNAME,hp.hash,hp.salt,1,nowIso()).run();}
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();}
+}
+async function currentAuth(request,env){
+  await authInit(env);
+  const token=getCookie(request,"__Host-stock_heaven_session"); if(!token)return null;
+  const th=await sha256(token);
+  const row=await env.AUTH_DB.prepare(`SELECT role,username,created_at,expires_at FROM auth_sessions WHERE token_hash=?`).bind(th).first();
+  if(!row)return null;
+  if(row.expires_at && new Date(row.expires_at).getTime()<=Date.now()){await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE token_hash=?`).bind(th).run();return null;}
+  return row;
+}
+async function createSession(env,role,username){
+  const token=await randomSecret(), th=await sha256(token), now=Date.now();
+  const expires=role==='guest'?new Date(now+GUEST_SESSION_SECONDS*1000).toISOString():null;
+  await env.AUTH_DB.prepare(`INSERT INTO auth_sessions(token_hash,role,username,created_at,expires_at) VALUES (?,?,?,?,?)`).bind(th,role,username,new Date(now).toISOString(),expires).run();
+  return {token,expiresAt:expires};
+}
+async function requireAdmin(request,env){const s=await currentAuth(request,env);return s&&s.role==='admin'?s:null;}
+function adminCreds(env){return {username:env.ADMIN_USERNAME||ADMIN_FALLBACK_USERNAME,password:env.ADMIN_PASSWORD||ADMIN_FALLBACK_PASSWORD};}
+async function authJson(request,env,url){
+  if(url.pathname==='/api/auth/login'&&request.method==='POST'){
+    await authInit(env); let body={};try{body=await request.json()}catch(_){return json({error:"Invalid request"},400)}
+    const role=body.role==='admin'?'admin':'guest', username=String(body.username||'').trim(), password=String(body.password||'');
+    if(!username||!password)return json({error:"Username and password required"},400);
+    let ok=false, loginUsername=username;
+    if(role==='admin'){const c=adminCreds(env);ok=username===c.username&&password===c.password;}
+    else {const row=await env.AUTH_DB.prepare(`SELECT guest_username,guest_password_hash,guest_password_salt FROM auth_settings WHERE id=1`).first();ok=!!row&&username===row.guest_username&&await verifyPassword(password,row.guest_password_hash,row.guest_password_salt);loginUsername=row?.guest_username||username;}
+    if(!ok)return json({error:"Invalid credentials"},401);
+    const session=await createSession(env,role,loginUsername);
+    await env.AUTH_DB.prepare(`INSERT INTO auth_login_logs(role,username,login_at) VALUES (?,?,?)`).bind(role,loginUsername,nowIso()).run();
+    const headers=new Headers({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Set-Cookie":authCookie(session.token,role==='guest'?GUEST_SESSION_SECONDS:ADMIN_SESSION_SECONDS)});
+    return new Response(JSON.stringify({ok:true,session:{role,username:loginUsername,expiresAt:session.expiresAt}}),{status:200,headers});
+  }
+  if(url.pathname==='/api/auth/me'&&request.method==='GET'){
+    const s=await currentAuth(request,env); if(!s)return json({authenticated:false},401);
+    return json({authenticated:true,session:{role:s.role,username:s.username,loginAt:s.created_at,expiresAt:s.expires_at}});
+  }
+  if(url.pathname==='/api/auth/logout'&&request.method==='POST'){
+    const token=getCookie(request,"__Host-stock_heaven_session");if(token){await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE token_hash=?`).bind(await sha256(token)).run();}
+    return new Response(JSON.stringify({ok:true}),{status:200,headers:new Headers({"Content-Type":"application/json","Cache-Control":"no-store","Set-Cookie":clearAuthCookie()})});
+  }
+  if(url.pathname==='/api/admin/guest-credentials'){
+    if(request.method==='GET'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);const row=await env.AUTH_DB.prepare(`SELECT guest_username,guest_version,updated_at FROM auth_settings WHERE id=1`).first();return json({username:row.guest_username,version:row.guest_version,updatedAt:row.updated_at});}
+    if(request.method==='POST'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const u=String(b.username||'').trim(),p=String(b.password||'');if(u.length<3||p.length<4)return json({error:"Username min 3 and password min 4 characters"},400);const hp=await passwordHash(p);const old=await env.AUTH_DB.prepare(`SELECT guest_version FROM auth_settings WHERE id=1`).first();const version=Number(old?.guest_version||0)+1;await env.AUTH_DB.prepare(`UPDATE auth_settings SET guest_username=?,guest_password_hash=?,guest_password_salt=?,guest_version=?,updated_at=? WHERE id=1`).bind(u,hp.hash,hp.salt,version,nowIso()).run();await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest'`).run();return json({ok:true,username:u,version});}
+  }
+  if(url.pathname==='/api/auth/restrictions' && request.method==='GET'){
+    const s=await currentAuth(request,env);
+    if(!s)return json({error:'Authentication required'},401);
+    const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();
+    const restrictions={};
+    for(const r of rows.results||[]) restrictions[r.page]=!!r.restricted;
+    return json({restrictions});
+  }
+  if(url.pathname==='/api/admin/restrictions'){
+    if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
+    if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
+    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+  }
+  if(url.pathname==='/api/admin/login-log'){
+    if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
+    if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT role,username,login_at FROM auth_login_logs ORDER BY id DESC LIMIT 200`).all();return json({logs:(rows.results||[]).map(x=>({role:x.role,username:x.username,loginAt:x.login_at}))});}
+    if(request.method==='DELETE'){await env.AUTH_DB.prepare(`DELETE FROM auth_login_logs`).run();return json({ok:true});}
+  }
+  return null;
+}
+
+
+const DEFAULT_STUCK = [
+  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"208 × 647.73"},
+  {symbol:"ADANIENSOL",name:"Adani Energy Solutions Limited",stuckInfo:"33 × 2788.12"},
+  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"36 × 683.35"},
+  {symbol:"ADANIGREEN",name:"Adani Green Energy",stuckInfo:"9 × 2333.43"},
+  {symbol:"FMCGIETF.NS",name:"ICICI Pru Nifty FMCG ETF",stuckInfo:"550 × 56.07"},
+  {symbol:"TMPV",name:"Tata Motors Passenger Vehicles",stuckInfo:"27 × 508.60"},
+  {symbol:"NSLNISP",name:"NMDC Steel",stuckInfo:"31 × 52.85"}
+];
+const DEFAULT_ALERTS = [
+ {symbol:"AWL",name:"AWL",alertPrice:""},{symbol:"ADANIENSOL",name:"ADANIENSOL",alertPrice:""},
+ {symbol:"ADANIGREEN",name:"ADANIGREEN",alertPrice:""},{symbol:"NSLNISP",name:"NMDC Steel",alertPrice:""},
+ {symbol:"TMPV",name:"TMPV",alertPrice:""},{symbol:"RELIANCE",name:"Reliance Industries",alertPrice:""},
+ {symbol:"HDFCBANK",name:"HDFC Bank",alertPrice:""},{symbol:"TCS",name:"Tata Consultancy Services",alertPrice:""},
+ {symbol:"INFY",name:"Infosys",alertPrice:""},{symbol:"HINDUNILVR",name:"Hindustan Unilever",alertPrice:""},
+ {symbol:"ICICIBANK",name:"ICICI Bank",alertPrice:""},{symbol:"SBIN",name:"State Bank of India",alertPrice:""}
+];
+
+function parseStuckInfo(info){
+  const m=String(info||"").match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)\s*$/i);
+  return {quantity:m?Number(m[1]):0,buyPrice:m?Number(m[2]):0};
+}
+async function getStuckData(env){
+  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
+  if(!(rows.results||[]).length){
+    const stm=DEFAULT_STUCK.map((x,i)=>{const p=parseStuckInfo(x.stuckInfo);return env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(x.symbol,x.name,p.quantity,p.buyPrice,i)});
+    await env.AUTH_DB.batch(stm);
+    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
+  }
+  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,stuckInfo:`${r.quantity} × ${Number(r.buy_price).toFixed(2)}`}));
+}
+async function replaceStuckData(env,items){
+  const arr=Array.isArray(items)?items:[];
+  const stm=[env.AUTH_DB.prepare(`DELETE FROM stuck_stocks`)];
+  arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const p=parseStuckInfo(x.stuckInfo);stm.push(env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),p.quantity,p.buyPrice,i));});
+  await env.AUTH_DB.batch(stm);
+}
+async function getAlertsData(env){
+  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
+  if(!(rows.results||[]).length){
+    await env.AUTH_DB.batch(DEFAULT_ALERTS.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO alerts(symbol,name,target_price,sort_order) VALUES (?,?,?,?)`).bind(x.symbol,x.name,x.alertPrice===""?null:Number(x.alertPrice),i)));
+    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
+  }
+  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,alertPrice:r.target_price==null?"":String(r.target_price)}));
+}
+async function replaceAlertsData(env,items){
+  const arr=Array.isArray(items)?items:[];
+  const stm=[env.AUTH_DB.prepare(`DELETE FROM alerts`)];
+  arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const raw=String(x.alertPrice??"").trim();const target=raw===""?null:Number(raw);stm.push(env.AUTH_DB.prepare(`INSERT INTO alerts(symbol,name,target_price,sort_order) VALUES (?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),Number.isFinite(target)?target:null,i));});
+  await env.AUTH_DB.batch(stm);
+}
+async function getFavoritesData(env){
+  const gr=await env.AUTH_DB.prepare(`SELECT id,title,sort_order,collapsed FROM favorite_groups ORDER BY sort_order,id`).all();
+  const sr=await env.AUTH_DB.prepare(`SELECT id,group_id,symbol,name,note,sort_order FROM favorite_stocks ORDER BY group_id,sort_order,id`).all();
+  const stocks=sr.results||[];
+  return (gr.results||[]).map(g=>({id:g.id,title:g.title,collapsed:!!g.collapsed,stocks:stocks.filter(s=>s.group_id===g.id).map(s=>({id:s.id,symbol:s.symbol,name:s.name||s.symbol,note:s.note||""}))}));
+}
+async function replaceFavoritesData(env,groups){
+  const gs=Array.isArray(groups)?groups:[];
+  const stm=[env.AUTH_DB.prepare(`DELETE FROM favorite_stocks`),env.AUTH_DB.prepare(`DELETE FROM favorite_groups`)];
+  gs.forEach((g,i)=>{const title=String(g.title||"").trim();if(title)stm.push(env.AUTH_DB.prepare(`INSERT INTO favorite_groups(title,sort_order,collapsed) VALUES (?,?,?)`).bind(title,i,g.collapsed?1:0));});
+  await env.AUTH_DB.batch(stm);
+  const fresh=await env.AUTH_DB.prepare(`SELECT id,sort_order FROM favorite_groups ORDER BY sort_order,id`).all();
+  const ins=[];
+  (fresh.results||[]).forEach((g,i)=>{const src=gs[i]||{};(Array.isArray(src.stocks)?src.stocks:[]).forEach((x,j)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(symbol)ins.push(env.AUTH_DB.prepare(`INSERT INTO favorite_stocks(group_id,symbol,name,note,sort_order) VALUES (?,?,?,?,?)`).bind(g.id,symbol,String(x.name||symbol).trim(),String(x.note||""),j));});});
+  if(ins.length)await env.AUTH_DB.batch(ins);
+}
+async function dataJson(request,env,url){
+  if(!url.pathname.startsWith('/api/data/'))return null;
+  const session=await currentAuth(request,env);if(!session)return json({error:'Authentication required'},401);
+  const admin=session.role==='admin';
+  if(url.pathname==='/api/data/stuck'){
+    if(request.method==='GET')return json({items:await getStuckData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceStuckData(env,b.items);return json({ok:true,items:await getStuckData(env)});}
+  }
+  if(url.pathname==='/api/data/alerts'){
+    if(request.method==='GET')return json({items:await getAlertsData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceAlertsData(env,b.items);return json({ok:true,items:await getAlertsData(env)});}
+  }
+  if(url.pathname==='/api/data/favorites'){
+    if(request.method==='GET')return json({groups:await getFavoritesData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceFavoritesData(env,b.groups);return json({ok:true,groups:await getFavoritesData(env)});}
+  }
+  return json({error:'Method not allowed'},405);
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/data/")) {
+      try { const out = await dataJson(request, env, url); if (out) return out; } catch (e) { return json({ error: "Data service unavailable", detail: String(e?.message || e) }, 500); }
+    }
+
+    if (url.pathname.startsWith("/api/auth/") || url.pathname.startsWith("/api/admin/")) {
+      try { const out = await authJson(request, env, url); if (out) return out; } catch (e) { return json({ error: "Authentication service unavailable", detail: String(e?.message || e) }, 500); }
+    }
+
+    const protectedPage = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\//, "");
+    if (AUTH_PAGES.has(protectedPage)) {
+      const s = await currentAuth(request, env);
+      if (!s) return new Response("<h1>Login required</h1><p>Please login to Stock Heaven.</p><a href=\"/login.html\">Go to Login</a>",{status:401,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      if (protectedPage === "admin.html" && s.role !== "admin") return new Response("<h1>Admin only</h1>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+      if (s.role === "guest" && protectedPage !== "admin.html") { const rr=await env.AUTH_DB.prepare(`SELECT restricted FROM auth_restrictions WHERE page=?`).bind(protectedPage).first(); if (rr?.restricted) return new Response("<h1>Page Restricted</h1><p>Admin ne is page ko Guest ke liye restrict kiya hai.</p><a href=\"/index.html\">Back to Dashboard</a>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}}); }
+    }
+
+    if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe"].includes(url.pathname)) {
+      const s = await currentAuth(request, env);
+      if (!s) return json({error:"Authentication required"},401);
+    }
 
     if (url.pathname === "/api/search") {
       const q = (url.searchParams.get("q") || "").trim();
