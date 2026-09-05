@@ -12,9 +12,5 @@
       "database_name": "stock-heaven-auth",
       "database_id": "39e33b4b-0863-4eb8-8cab-35429a7e38f0"
     }
-  ],
-  "vars": {
-    "ADMIN_USERNAME": "admin",
-    "DEFAULT_GUEST_USERNAME": "guest"
-  }
+  ]
 }
