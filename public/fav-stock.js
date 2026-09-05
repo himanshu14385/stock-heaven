@@ -109,27 +109,57 @@ function openStockModal(groupId){if(!window.requireAdmin())return;
 }
 function closeStockModal(){hideModal("stockModal"); activeGroupId=null;}
 async function searchRemote(q){
-  try{ const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`); const d=await r.json(); if(r.ok&&!d.error&&Array.isArray(d.results))return d.results; }catch(e){}
+  try{ const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`, {credentials:'same-origin',cache:'no-store'}); const d=await r.json(); if(r.ok&&!d.error&&Array.isArray(d.results))return d.results; }catch(e){}
   const u=q.toUpperCase(); return fallbackStocks.filter(s=>s[0].includes(u)||s[1].toUpperCase().includes(u)).map(s=>({symbol:s[0],name:s[1]})).slice(0,10);
 }
 function renderSuggestions(list){
   const box=document.getElementById("favSuggestions");
-  if(!list.length){box.innerHTML=`<div class="fav-suggestion-empty">No stock found. You can add the symbol manually.</div>`;return;}
-  box.innerHTML=list.slice(0,10).map(s=>`<button class="fav-suggestion" type="button" onclick="addStock('${String(s.symbol).replace(/'/g,"\\'")}','${String(s.name||s.symbol).replace(/'/g,"\\'")}')"><span class="fav-suggestion-logo"><i class="fa-solid fa-chart-line"></i></span><span><b>${esc(s.name||s.symbol)}</b><small>NSE · ${esc(displaySymbol(s.symbol))}</small></span></button>`).join("");
+  if(!list.length){box.innerHTML=`<div class="fav-suggestion-empty"><i class="fa-solid fa-magnifying-glass"></i><div><b>No stock found</b><span>Use the symbol below to add it manually.</span></div></div>`;return;}
+  box.innerHTML=list.slice(0,10).map((s,i)=>`<button class="fav-suggestion" type="button" data-suggestion-index="${i}"><span class="fav-suggestion-logo"><i class="fa-solid fa-chart-line"></i></span><span><b>${esc(s.name||s.symbol)}</b><small>NSE · ${esc(displaySymbol(s.symbol))}</small></span><i class="fa-solid fa-plus"></i></button>`).join("");
+  box.querySelectorAll('[data-suggestion-index]').forEach(btn=>btn.addEventListener('click',()=>{
+    const item=list[Number(btn.dataset.suggestionIndex)];
+    if(item) addStock(item.symbol,item.name||item.symbol);
+  }));
 }
 function searchFavStocks(){
   const q=document.getElementById("favStockInput").value.trim(); const box=document.getElementById("favSuggestions");
   clearTimeout(searchTimer); if(!q){box.innerHTML="";return;}
-  const id=++searchRequest; searchTimer=setTimeout(async()=>{const list=await searchRemote(q); if(id===searchRequest)renderSuggestions(list);},250);
+  const id=++searchRequest; box.innerHTML=`<div class="fav-searching"><i class="fa-solid fa-spinner fa-spin"></i> Searching stocks…</div>`;
+  searchTimer=setTimeout(async()=>{const list=await searchRemote(q); if(id===searchRequest)renderSuggestions(list);},220);
 }
-function favStockKey(e){ if(e.key==="Escape")closeStockModal(); if(e.key==="Enter"){e.preventDefault(); const first=document.querySelector(".fav-suggestion"); if(first)first.click(); else addManualStock();} }
-function addStock(symbol,name){if(!window.requireAdmin())return;
-  const g=groups.find(x=>x.id===activeGroupId); if(!g)return;
-  const clean=symbolClean(symbol); if(!clean)return;
+function favStockKey(e){
+  if(e.key==="Escape"){e.preventDefault();closeStockModal();return;}
+  if(e.key==="Enter"){
+    e.preventDefault();
+    const first=document.querySelector(".fav-suggestion");
+    if(first) first.click(); else addManualStock();
+  }
+}
+async function addStock(symbol,name){
+  if(!window.requireAdmin())return;
+  const g=groups.find(x=>String(x.id)===String(activeGroupId)); if(!g)return;
+  const clean=symbolClean(symbol); if(!clean){alert("Stock symbol enter karo");return;}
   if((g.stocks||[]).some(s=>symbolClean(s.symbol)===clean)){alert("Ye stock is card me already added hai");return;}
-  g.stocks=g.stocks||[]; g.stocks.push({id:null,symbol:clean,name:name||clean,note:""}); saveGroups().then(()=>{closeStockModal();render();fetchPrice(clean)}).catch(e=>alert(e.message||"Save failed"));
+  const btn=document.querySelector('#stockModal .fav-btn.primary');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Saving…';}
+  g.stocks=g.stocks||[];
+  const old=g.stocks.slice();
+  g.stocks.push({id:null,symbol:clean,name:String(name||clean).trim()||clean,note:""});
+  try{
+    await saveGroups();
+    closeStockModal();render();fetchPrice(clean);
+  }catch(e){
+    g.stocks=old; render(); alert(e.message||"Stock save failed. Please try again.");
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check"></i> Add Stock';}
+  }
 }
-function addManualStock(){if(!window.requireAdmin())return; const q=symbolClean(document.getElementById("favStockInput").value); if(!q){alert("Stock symbol enter karo");return;} addStock(q,q); }
+function addManualStock(){
+  if(!window.requireAdmin())return;
+  const q=symbolClean(document.getElementById("favStockInput").value);
+  if(!q){alert("Stock symbol enter karo");return;}
+  addStock(q,q);
+}
 function removeStock(groupId,index){if(!window.requireAdmin())return; const g=groups.find(x=>x.id===groupId); if(!g)return; g.stocks.splice(index,1); saveGroups().then(render).catch(e=>alert(e.message||"Delete failed")); }
 async function fetchPrice(symbol, force=false){
   if(!force && prices[symbol]) return;
