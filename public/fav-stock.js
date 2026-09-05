@@ -20,6 +20,31 @@ let activeGroupId = null;
 let searchTimer = null;
 let searchRequest = 0;
 const prices = {};
+const CARD_IDENTITIES = [
+  ["favourite","fa-solid fa-star","Favourite"],["swing","fa-solid fa-chart-line","Swing"],["long-term","fa-solid fa-building-columns","Long Term"],
+  ["safe","fa-solid fa-shield-halved","Safe"],["trading","fa-solid fa-bolt","Trading"],["etf","fa-solid fa-chart-pie","ETF"],
+  ["bullish","fa-solid fa-arrow-trend-up","Bullish"],["bearish","fa-solid fa-arrow-trend-down","Bearish"],["focus","fa-solid fa-bullseye","Focus"],
+  ["gold","fa-solid fa-coins","Gold"],["silver","fa-solid fa-coins","Silver"],["oil","fa-solid fa-oil-well","Oil"],["metal","fa-solid fa-industry","Metal"],
+  ["energy","fa-solid fa-bolt","Energy"],["bank","fa-solid fa-building-columns","Bank"],["growth","fa-solid fa-rocket","Growth"],
+  ["dividend","fa-solid fa-money-bill-trend-up","Dividend"],["blue-chip","fa-solid fa-gem","Blue Chip"],["hot","fa-solid fa-fire","Hot"],
+  ["watchlist","fa-solid fa-eye","Watchlist"],["opportunity","fa-solid fa-lightbulb","Opportunity"],["research","fa-solid fa-magnifying-glass-chart","Research"],
+  ["consumer","fa-solid fa-cart-shopping","Consumer"],["it","fa-solid fa-laptop-code","IT"],["pharma","fa-solid fa-pills","Pharma"],["auto","fa-solid fa-car","Auto"],
+  ["infra","fa-solid fa-road","Infra"],["realty","fa-solid fa-house","Realty"],["agriculture","fa-solid fa-wheat-awn","Agriculture"],["chemical","fa-solid fa-flask","Chemical"],
+  ["telecom","fa-solid fa-tower-cell","Telecom"],["healthcare","fa-solid fa-heart-pulse","Healthcare"],["global","fa-solid fa-globe","Global"],["india","fa-solid fa-flag","India"],
+  ["commodity","fa-solid fa-boxes-stacked","Commodity"],["psu","fa-solid fa-landmark","PSU"],["private","fa-solid fa-briefcase","Private"],["financial","fa-solid fa-file-invoice-dollar","Financial"],
+  ["defence","fa-solid fa-shield","Defence"],["renewable","fa-solid fa-solar-panel","Renewable"],["green","fa-solid fa-leaf","Green"],["water","fa-solid fa-droplet","Water"],
+  ["battery","fa-solid fa-battery-full","Battery"],["technology","fa-solid fa-microchip","Technology"],["housing","fa-solid fa-house-chimney","Housing"],["aviation","fa-solid fa-plane","Aviation"],
+  ["shipping","fa-solid fa-ship","Shipping"],["mining","fa-solid fa-helmet-safety","Mining"],["cement","fa-solid fa-cubes","Cement"],["fmcg","fa-solid fa-basket-shopping","FMCG"],
+  ["retail","fa-solid fa-store","Retail"],["logistics","fa-solid fa-truck","Logistics"],["biotech","fa-solid fa-dna","Biotech"],["top-pick","fa-solid fa-trophy","Top Pick"],
+  ["risk","fa-solid fa-triangle-exclamation","Risk"],["avoid","fa-solid fa-circle-xmark","Avoid"],["accumulate","fa-solid fa-circle-plus","Accumulate"]
+];
+function identityInfo(key){ return CARD_IDENTITIES.find(x=>x[0]===key)||CARD_IDENTITIES[0]; }
+function renderIdentityPicker(selected){
+  const box=document.getElementById('cardIdentityPicker'); if(!box)return;
+  box.innerHTML=CARD_IDENTITIES.map(x=>`<button type="button" class="fav-identity-option ${x[0]===selected?'selected':''}" data-identity="${esc(x[0])}" title="${esc(x[2])}"><i class="${esc(x[1])}"></i><span>${esc(x[2])}</span></button>`).join('');
+  box.querySelectorAll('.fav-identity-option').forEach(b=>b.addEventListener('click',()=>{box.querySelectorAll('.fav-identity-option').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');box.dataset.selected=b.dataset.identity;}));
+  box.dataset.selected=selected||'favourite';
+}
 
 function uid(){ return "g" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function esc(v){ return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -56,8 +81,9 @@ function render(){
     box.innerHTML=`<div class="fav-empty"><div class="fav-empty-icon"><i class="fa-regular fa-star"></i></div><h3>No favourite cards yet</h3><p>Create a card such as <b>Focus ETF</b> or <b>Swing ETF</b>, then add your stocks inside it.</p><button type="button" onclick="openCardModal()"><i class="fa-solid fa-plus"></i> Create First Card</button></div>`;
     return;
   }
-  box.innerHTML=groups.map(g=>{
+  box.innerHTML=groups.map((g,cardIdx)=>{
     const collapsed=!!g.collapsed;
+    const identity=identityInfo(g.identity||g.icon_key||'favourite');
     const rows=(g.stocks||[]).map((s,idx)=>{
       const p=prices[s.symbol]||{};
       const ch=Number(p.change), pc=Number(p.percent_change);
@@ -70,9 +96,9 @@ function render(){
         <div class="fav-stock-actions"><button class="fav-move-stock" type="button" title="Move up" ${idx===0?'disabled':''} onclick="event.stopPropagation();moveStock('${g.id}',${idx},-1)"><i class="fa-solid fa-chevron-up"></i></button><button class="fav-move-stock" type="button" title="Move down" ${(idx===(g.stocks||[]).length-1)?'disabled':''} onclick="event.stopPropagation();moveStock('${g.id}',${idx},1)"><i class="fa-solid fa-chevron-down"></i></button><button class="fav-note-stock" type="button" title="${note?"Edit note":"Add note"}" onclick="event.stopPropagation();editStockNote('${g.id}',${idx})"><i class="fa-regular fa-note-sticky"></i></button><button class="fav-remove-stock" type="button" title="Remove stock" onclick="event.stopPropagation();removeStock('${g.id}',${idx})"><i class="fa-solid fa-xmark"></i></button></div>
       </div>`;
     }).join("");
-    return `<article class="fav-card ${collapsed?"is-collapsed":""}">
-      <div class="fav-card-head"><div class="fav-card-title" onclick="toggleCard('${g.id}')" title="${collapsed?"Expand":"Collapse"} card"><div class="fav-card-star"><i class="fa-solid fa-star"></i></div><div><h3>${esc(g.title)}</h3><span>${(g.stocks||[]).length} ${(g.stocks||[]).length===1?"stock":"stocks"}</span></div></div>
-      <div class="fav-card-actions"><button type="button" title="${collapsed?"Expand":"Collapse"} card" onclick="toggleCard('${g.id}')"><i class="fa-solid fa-chevron-${collapsed?"down":"up"}"></i></button><button type="button" title="Edit title" onclick="openEditCard('${g.id}')"><i class="fa-solid fa-pen"></i></button><button type="button" title="Delete card" onclick="deleteCard('${g.id}')"><i class="fa-solid fa-trash"></i></button></div></div>
+    return `<article class="fav-card ${collapsed?"is-collapsed":""}" draggable="true" data-card-id="${esc(g.id)}" ondragstart="dragCard(event,'${g.id}')" ondragover="allowCardDrop(event)" ondrop="dropCard(event,'${g.id}')">
+      <div class="fav-card-head"><div class="fav-card-title" onclick="toggleCard('${g.id}')" title="${collapsed?"Expand":"Collapse"} card"><div class="fav-card-drag-handle" title="Drag card to reorder"><i class="fa-solid fa-grip-vertical"></i></div><div class="fav-card-star"><i class="${esc(identity[1])}"></i></div><div><h3>${esc(g.title)}</h3><span>${esc(identity[2])} · ${(g.stocks||[]).length} ${(g.stocks||[]).length===1?"stock":"stocks"}</span></div></div>
+      <div class="fav-card-actions"><button type="button" class="fav-card-move" title="Move card up" ${cardIdx===0?'disabled':''} onclick="event.stopPropagation();moveCard(${cardIdx},-1)"><i class="fa-solid fa-chevron-up"></i></button><button type="button" class="fav-card-move" title="Move card down" ${cardIdx===groups.length-1?'disabled':''} onclick="event.stopPropagation();moveCard(${cardIdx},1)"><i class="fa-solid fa-chevron-down"></i></button><button type="button" title="${collapsed?"Expand":"Collapse"} card" onclick="toggleCard('${g.id}')"><i class="fa-solid fa-chevron-${collapsed?"down":"up"}"></i></button><button type="button" title="Edit card" onclick="openEditCard('${g.id}')"><i class="fa-solid fa-pen"></i></button><button type="button" title="Delete card" onclick="deleteCard('${g.id}')"><i class="fa-solid fa-trash"></i></button></div></div>
       <div class="fav-card-body"><div class="fav-stock-list">${rows || `<div class="fav-card-empty"><i class="fa-regular fa-star"></i><span>No stocks added yet</span></div>`}</div>
       <button class="fav-add-stock" type="button" onclick="openStockModal('${g.id}')"><i class="fa-solid fa-plus"></i> Add Stock</button></div>
     </article>`;
@@ -83,6 +109,7 @@ function openCardModal(){if(!window.requireAdmin())return;
   modalMode="add"; editingGroupId=null;
   document.getElementById("modalTitle").textContent="Add Card";
   document.getElementById("cardTitleInput").value="";
+  renderIdentityPicker('favourite');
   showModal("cardModal");
   setTimeout(()=>document.getElementById("cardTitleInput").focus(),50);
 }
@@ -91,13 +118,15 @@ function openEditCard(id){if(!window.requireAdmin())return;
   modalMode="edit"; editingGroupId=id;
   document.getElementById("modalTitle").textContent="Edit Card";
   document.getElementById("cardTitleInput").value=g.title;
+  renderIdentityPicker(g.identity||g.icon_key||'favourite');
   showModal("cardModal"); setTimeout(()=>{const x=document.getElementById("cardTitleInput");x.focus();x.select();},50);
 }
 function saveCard(){if(!window.requireAdmin())return;
   const title=document.getElementById("cardTitleInput").value.trim();
+  const identity=document.getElementById("cardIdentityPicker")?.dataset.selected||'favourite';
   if(!title){ alert("Card title enter karo"); return; }
-  if(modalMode==="edit") { const g=groups.find(x=>String(x.id)===String(editingGroupId)); if(g)g.title=title; }
-  else groups.push({id:null,title,stocks:[]});
+  if(modalMode==="edit") { const g=groups.find(x=>String(x.id)===String(editingGroupId)); if(g){g.title=title;g.identity=identity;} }
+  else groups.push({id:null,title,identity,collapsed:false,stocks:[]});
   saveGroups().then(()=>{closeCardModal();render();}).catch(e=>alert(e.message||"Save failed"));
 }
 function deleteCard(id){if(!window.requireAdmin())return;
@@ -170,6 +199,27 @@ function addManualStock(){
   if(!q){alert("Stock symbol enter karo");return;}
   addStock(q,q);
 }
+
+let draggedCard=null;
+function dragCard(event,id){
+  if(!window.requireAdmin())return;
+  draggedCard={id}; event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',String(id)); event.currentTarget.classList.add('dragging-card');
+}
+function allowCardDrop(event){event.preventDefault();event.dataTransfer.dropEffect='move';}
+async function dropCard(event,targetId){
+  if(!window.requireAdmin())return; event.preventDefault();
+  if(!draggedCard || String(draggedCard.id)===String(targetId))return;
+  const from=groups.findIndex(g=>String(g.id)===String(draggedCard.id)); const to=groups.findIndex(g=>String(g.id)===String(targetId));
+  if(from<0||to<0)return;
+  const [item]=groups.splice(from,1); groups.splice(to,0,item); draggedCard=null;
+  try{await saveGroups();render();}catch(e){alert(e.message||'Card reorder failed');await loadGroups().catch(()=>{});render();}
+}
+async function moveCard(index,direction){
+  if(!window.requireAdmin())return; const to=index+direction; if(index<0||to<0||to>=groups.length)return;
+  const copy=groups.slice(); [copy[index],copy[to]]=[copy[to],copy[index]]; groups=copy;
+  try{await saveGroups();render();}catch(e){alert(e.message||'Card reorder failed');await loadGroups().catch(()=>{});render();}
+}
+document.addEventListener('dragend',()=>{document.querySelectorAll('.fav-card.dragging-card').forEach(x=>x.classList.remove('dragging-card'));draggedCard=null;});
 
 async function moveStock(groupId,index,direction){
   if(!window.requireAdmin())return;
