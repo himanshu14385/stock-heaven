@@ -474,12 +474,22 @@ async function replaceStuckData(env,items){
   arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const p=parseStuckInfo(x.stuckInfo);stm.push(env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),p.quantity,p.buyPrice,i));});
   await env.AUTH_DB.batch(stm);
 }
+async function ensureAlertsSchema(env){
+  const info=await env.AUTH_DB.prepare(`PRAGMA table_info(alerts)`).all();
+  const target=(info.results||[]).find(x=>x.name==='target_price');
+  if(!target || Number(target.notnull)!==1)return;
+  // Safe one-time migration for older D1 schema where an unset alert price was NOT NULL.
+  await env.AUTH_DB.batch([
+    env.AUTH_DB.prepare(`CREATE TABLE alerts_new (id INTEGER PRIMARY KEY AUTOINCREMENT, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', target_price REAL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),
+    env.AUTH_DB.prepare(`INSERT INTO alerts_new (id,symbol,name,target_price,sort_order,created_at,updated_at) SELECT id,symbol,name,target_price,sort_order,created_at,updated_at FROM alerts`),
+    env.AUTH_DB.prepare(`DROP TABLE alerts`),
+    env.AUTH_DB.prepare(`ALTER TABLE alerts_new RENAME TO alerts`),
+    env.AUTH_DB.prepare(`CREATE INDEX IF NOT EXISTS idx_alerts_order ON alerts(sort_order)`)
+  ]);
+}
 async function getAlertsData(env){
-  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
-  if(!(rows.results||[]).length){
-    await env.AUTH_DB.batch(DEFAULT_ALERTS.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO alerts(symbol,name,target_price,sort_order) VALUES (?,?,?,?)`).bind(x.symbol,x.name,x.alertPrice===""?null:Number(x.alertPrice),i)));
-    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
-  }
+  await ensureAlertsSchema(env);
+  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,target_price,sort_order FROM alerts ORDER BY sort_order,id`).all();
   return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,alertPrice:r.target_price==null?"":String(r.target_price)}));
 }
 async function replaceAlertsData(env,items){
