@@ -27,36 +27,63 @@ function renderMovement(d){
         condition('Breakout retest',retest?'Recent candle tested the breakout zone.':'Retest not confirmed yet.',retest)
     ].join('');
 }
+function atr(h,l,c,n=14){
+    if(h.length<=n||l.length<=n||c.length<=n)return null;
+    const tr=[];
+    for(let i=1;i<c.length;i++){
+        const hi=Number(h[i]),lo=Number(l[i]),pc=Number(c[i-1]);
+        if(Number.isFinite(hi)&&Number.isFinite(lo)&&Number.isFinite(pc))tr.push(Math.max(hi-lo,Math.abs(hi-pc),Math.abs(lo-pc)));
+    }
+    return tr.length<n?null:tr.slice(-n).reduce((a,b)=>a+b,0)/n;
+}
 function renderSwing(d){
-    const {price,e20,e50,R,av,vw,res,sup,volume}=d;
+    const {price,e20,e50,e200,R,av,vw,res,sup,volume,atr14,relativeStrength,stockReturn20,niftyReturn20}=d;
     const trend=e20!=null&&e50!=null&&e20>e50;
-    const above20=price>e20;
-    const pullback=price>=e20*0.985&&price<=e20*1.03;
+    const above20=Number.isFinite(e20)&&price>e20;
+    const longTrend=e200!=null&&price>e200;
+    const pullback=Number.isFinite(e20)&&price>=e20*0.985&&price<=e20*1.03;
     const swingRsi=R>=50&&R<=68;
-    const volOk=Number(volume)>av*1.15;
+    const volOk=Number.isFinite(av)&&Number(volume)>av*1.15;
     const vwapOk=vw!=null&&price>vw;
     const room=res!=null&&price<res*0.985;
-    const checks=[trend,above20,pullback,swingRsi,volOk,vwapOk,room];
+    const atrRoom=atr14!=null&&sup!=null&&(price-Math.min(sup,e20!=null?e20*0.97:sup))>=atr14*0.75;
+    const relativeOk=relativeStrength!=null&&relativeStrength>0;
+    const checks=[trend,above20,longTrend,pullback,swingRsi,volOk,vwapOk,room,atrRoom,relativeOk];
     const score=checks.filter(Boolean).length;
-    const signal=score>=6?'BUY SETUP':score>=4?'WAIT':'AVOID';
+    const signal=score>=8?'BUY SETUP':score>=5?'WAIT':'AVOID';
+
     let entry=null,sl=null,target=null,rr=null;
-    if(sup!=null&&res!=null){
-        entry=Math.max(price,e20);
-        sl=Math.min(sup,e20*0.97);
-        const risk=entry-sl;
-        target=entry+risk*2;
-        rr=risk>0?(target-entry)/risk:null;
+    if(price!=null){
+        entry=price;
+        const supportStop=sup!=null?sup:null;
+        const atrStop=atr14!=null?price-1.5*atr14:null;
+        sl=supportStop!=null&&atrStop!=null?Math.min(supportStop,atrStop):supportStop!=null?supportStop:atrStop;
+        if(sl!=null&&sl<entry){
+            const risk=entry-sl;
+            target=entry+risk*2;
+            rr=(target-entry)/risk;
+        }
     }
-    setSignal(signal,score,7,score>=6?'Trend, momentum and pullback structure are aligned for a swing setup.':score>=4?'The swing structure is developing. Wait for a cleaner pullback or confirmation.':'The stock does not currently show enough swing-trade confirmations.');
+
+    setSignal(signal,score,10,
+        score>=8?'Trend, momentum, volume and risk structure are aligned for a swing setup.':
+        score>=5?'The swing structure is developing. Wait for stronger confirmation and better risk room.':
+        'The stock does not currently show enough swing-trade confirmations.'
+    );
     set('entry',fmt(entry));set('sl',fmt(sl));set('target',fmt(target));set('rr',rr?`1:${rr.toFixed(1)}`:'--');set('swingDataDate',d.as_of?`Data: ${d.as_of}`:'Daily data');
+
+    const rsDetail=relativeStrength==null?'NIFTY comparison unavailable':`${fmtPct(stockReturn20)} stock vs ${fmtPct(niftyReturn20)} NIFTY`;
     $('swingConditionList').innerHTML=[
         condition('20 EMA > 50 EMA',`${fmt(e20)} > ${fmt(e50)}`,trend),
-        condition('Price above 20 EMA',`${fmt(price)} vs ${fmt(e20)}`,above20),
-        condition('Healthy pullback zone',pullback?'Price is near the 20 EMA zone.':`Price is outside the pullback zone.`,pullback),
+        condition('Price > 20 EMA',`${fmt(price)} vs ${fmt(e20)}`,above20),
+        condition('Price > 200 EMA',`${fmt(price)} vs ${fmt(e200)}`,longTrend),
+        condition('Healthy pullback zone',pullback?'Price is near the 20 EMA zone.':'Price is outside the pullback zone.',pullback),
         condition('RSI (14) 50–68',`Current RSI ${R?.toFixed(1)||'--'}`,swingRsi),
         condition('Volume support',`${fmtN(volume)} vs 1.15× avg ${fmtN(av)}`,volOk),
         condition('Price > VWAP',`${fmt(price)} vs ${fmt(vw)}`,vwapOk),
-        condition('Room to resistance',res!=null?`${fmt(price)} vs ${fmt(res)}`:'Resistance unavailable',room)
+        condition('Room to resistance',res!=null?`${fmt(price)} vs ${fmt(res)}`:'Resistance unavailable',room),
+        condition('ATR / SL room',atr14!=null?`ATR ${fmt(atr14)} · enough room for SL`:'ATR unavailable',atrRoom),
+        condition('Relative strength vs NIFTY',rsDetail,relativeOk)
     ].join('');
 }
 function renderTab(){
@@ -67,7 +94,86 @@ function renderTab(){
     renderSwingOrMovement();
 }
 function renderSwingOrMovement(){if(!currentData)return;currentTab==='swing'?renderSwing(currentData):renderMovement(currentData)}
-async function analyze(symbol){const id=++req;symbol=(symbol||'').trim().toUpperCase();if(!symbol)return;$('status').textContent='Loading market data…';$('result').hidden=true;try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);const d=await r.json();if(id!==req)return;if(!r.ok||d.error)throw Error(d.error||'Stock not found');let hist=d.history||[];let c=hist.map(x=>Number(x.close)).filter(Number.isFinite),h=hist.map(x=>Number(x.high)),l=hist.map(x=>Number(x.low)),v=hist.map(x=>Number(x.volume||0));if(c.length<50)throw Error(`Only ${c.length} daily records available. At least 50 are needed.`);let price=Number(d.price),e20=ema(c,20),e50=ema(c,50),R=rsi(c),av=sma(v,20),vw=vwap20(h,l,c,v);let prevHigh=h.slice(0,-1).slice(-20).filter(Number.isFinite),prevLow=l.slice(0,-1).slice(-20).filter(Number.isFinite),res=prevHigh.length?Math.max(...prevHigh):null,sup=prevLow.length?Math.min(...prevLow):null;let trend=price>e20&&e20>e50,above20=price>e20,volBreak=Number(d.volume)>av*1.5,rsiz=R>=55&&R<=70,aboveVwap=vw!=null&&price>vw,breakout=res!=null&&price>res;let retest=false;if(res!=null){for(let i=Math.max(0,l.length-5);i<l.length-1;i++){if(l[i]<=res*1.015&&c[i]>=res*0.995&&c[i]<=res*1.03){retest=true;break}}}let checks=[trend,above20,volBreak,rsiz,aboveVwap,breakout,retest],score=checks.filter(Boolean).length;let entry=breakout?(retest?Math.max(price,res):res):null,sl=(retest&&sup?Math.min(sup,res*0.985):res?res*0.985:null),risk=entry&&sl?entry-sl:null,target=entry&&risk?entry+risk*2:null,rr=entry&&risk&&target?(target-entry)/risk:null;currentData={...d,price,e20,e50,R,av,vw,res,sup,volume:Number(d.volume),trend,above20,volBreak,rsiz,aboveVwap,breakout,retest,checks,score,entry,sl,target,rr};set('symbol',symbol.replace(/\.NS$/,''));set('company',d.name||symbol);set('price',fmt(price));set('change',`${fmt(d.change)} (${fmtPct(d.percent_change)})`);$('result').hidden=false;$('status').textContent='Analysis complete.';renderTab()}catch(e){if(id===req){currentData=null;$('status').textContent=e.message||'Unable to analyze stock.'}}}
+async function analyze(symbol){
+    const id=++req;
+    symbol=(symbol||'').trim().toUpperCase();
+    if(!symbol)return;
+    $('status').textContent='Loading market data…';
+    $('result').hidden=true;
+    try{
+        const [stockResponse,niftyResponse]=await Promise.all([
+            fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`),
+            fetch('/api/stock?symbol=%5ENSEI')
+        ]);
+        const d=await stockResponse.json();
+        const nifty=await niftyResponse.json().catch(()=>({}));
+        if(id!==req)return;
+        if(!stockResponse.ok||d.error)throw Error(d.error||'Stock not found');
+
+        let hist=d.history||[];
+        let c=hist.map(x=>Number(x.close)).filter(Number.isFinite),
+            h=hist.map(x=>Number(x.high)),
+            l=hist.map(x=>Number(x.low)),
+            v=hist.map(x=>Number(x.volume||0));
+        if(c.length<50)throw Error(`Only ${c.length} daily records available. At least 50 are needed.`);
+
+        let price=Number(d.price),
+            e20=ema(c,20),
+            e50=ema(c,50),
+            e200=ema(c,200),
+            R=rsi(c),
+            av=sma(v,20),
+            vw=vwap20(h,l,c,v),
+            atr14=atr(h,l,c,14);
+
+        let prevHigh=h.slice(0,-1).slice(-20).filter(Number.isFinite),
+            prevLow=l.slice(0,-1).slice(-20).filter(Number.isFinite),
+            res=prevHigh.length?Math.max(...prevHigh):null,
+            sup=prevLow.length?Math.min(...prevLow):null;
+
+        let trend=price>e20&&e20>e50,
+            above20=price>e20,
+            volBreak=Number(d.volume)>av*1.5,
+            rsiz=R>=55&&R<=70,
+            aboveVwap=vw!=null&&price>vw,
+            breakout=res!=null&&price>res;
+
+        let retest=false;
+        if(res!=null){
+            for(let i=Math.max(0,l.length-5);i<l.length-1;i++){
+                if(l[i]<=res*1.015&&c[i]>=res*0.995&&c[i]<=res*1.03){retest=true;break}
+            }
+        }
+
+        let checks=[trend,above20,volBreak,rsiz,aboveVwap,breakout,retest],
+            score=checks.filter(Boolean).length,
+            entry=breakout?(retest?Math.max(price,res):res):null,
+            sl=(retest&&sup?Math.min(sup,res*0.985):res?res*0.985:null),
+            risk=entry&&sl?entry-sl:null,
+            target=entry&&risk?entry+risk*2:null,
+            rr=entry&&risk&&target?(target-entry)/risk:null;
+
+        // Compare the stock's recent performance with NIFTY once at search time.
+        let stockReturn20=null,niftyReturn20=null,relativeStrength=null;
+        const nc=(nifty.history||[]).map(x=>Number(x.close)).filter(Number.isFinite);
+        if(c.length>=21&&nc.length>=21){
+            stockReturn20=((c[c.length-1]/c[c.length-21])-1)*100;
+            niftyReturn20=((nc[nc.length-1]/nc[nc.length-21])-1)*100;
+            relativeStrength=stockReturn20-niftyReturn20;
+        }
+
+        currentData={...d,price,e20,e50,e200,R,av,vw,res,sup,volume:Number(d.volume),atr14,stockReturn20,niftyReturn20,relativeStrength,trend,above20,volBreak,rsiz,aboveVwap,breakout,retest,checks,score,entry,sl,target,rr};
+        set('symbol',symbol.replace(/\.NS$/,''));
+        set('company',d.name||symbol);
+        set('price',fmt(price));
+        set('change',`${fmt(d.change)} (${fmtPct(d.percent_change)})`);
+        $('result').hidden=false;
+        $('status').textContent='Analysis complete.';
+        renderTab();
+    }catch(e){
+        if(id===req){currentData=null;$('status').textContent=e.message||'Unable to analyze stock.'}
+    }
+}
 
 document.querySelectorAll('.catch-tab').forEach(tab=>tab.addEventListener('click',()=>{currentTab=tab.dataset.tab;document.querySelectorAll('.catch-tab').forEach(x=>{const active=x===tab;x.classList.toggle('active',active);x.setAttribute('aria-selected',active?'true':'false')});if(currentData){$('result').hidden=false;renderTab()}}));
 $('movementInput').addEventListener('input',()=>{clearTimeout(timer);let q=$('movementInput').value.trim();if(!q){$('movementSuggestions').style.display='none';return}timer=setTimeout(async()=>{try{suggestions(await search(q))}catch(_){suggestions([])}},250)});
