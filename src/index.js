@@ -325,7 +325,7 @@ async function fetchDynamicPeers(symbol) {
 }
 
 
-const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","admin.html"]);
+const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","admin.html"]);
 const PROTECTED_PAGE_ALIASES = {
   "/": "index.html",
   "/index.html": "index.html",
@@ -333,6 +333,7 @@ const PROTECTED_PAGE_ALIASES = {
   "/summary.html": "summary.html",
   "/alert.html": "alert.html",
   "/fav-stock.html": "fav-stock.html",
+  "/movement-catch.html": "movement-catch.html",
   "/admin.html": "admin.html"
 };
 const GUEST_SESSION_SECONDS = 5 * 60;
@@ -370,7 +371,7 @@ async function authInit(env){
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
   // Do NOT create a default Guest account. The single Guest credential must be
   // explicitly provisioned through the Admin panel / D1.
-  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html"]){
     await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
   }
 }
@@ -447,7 +448,7 @@ async function authJson(request,env,url){
   if(url.pathname==='/api/admin/restrictions'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
     if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
-    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
   }
   if(url.pathname==='/api/admin/login-log'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
