@@ -426,7 +426,17 @@ async function authJson(request,env,url){
   if(url.pathname==='/api/admin/restrictions'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
     if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
-    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+    if(request.method==='POST'){
+      let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}
+      const r=b.restrictions&&typeof b.restrictions==='object'?b.restrictions:{};
+      const pages=["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html"];
+      const ts=nowIso();
+      const stm=pages.map(page=>env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]===true?1:0,ts));
+      await env.AUTH_DB.batch(stm);
+      const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions WHERE page IN ('index.html','stuck-stock.html','summary.html','alert.html','fav-stock.html')`).all();
+      const saved={};for(const row of rows.results||[]) saved[row.page]=Number(row.restricted)===1;
+      return json({ok:true,restrictions:saved});
+    }
   }
   if(url.pathname==='/api/admin/login-log'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
@@ -548,15 +558,7 @@ export default {
       }
       if (!s) return new Response("<h1>Login required</h1><p>Please login to Stock Heaven.</p><a href=\"/login.html\">Go to Login</a>",{status:401,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
       if (protectedPage === "admin.html" && s.role !== "admin") return new Response("<h1>Admin only</h1>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
-      if (s.role === "guest" && protectedPage !== "admin.html") {
-        const rr = await env.AUTH_DB.prepare(`SELECT restricted FROM auth_restrictions WHERE page=?`).bind(protectedPage).first();
-        if (Number(rr?.restricted) === 1) {
-          return new Response("<h1>Page Restricted</h1><p>Admin ne is page ko Guest ke liye restrict kiya hai.</p><a href=\"/index.html\">Back to Dashboard</a>", {
-            status: 403,
-            headers: {"Content-Type":"text/html; charset=utf-8", "Cache-Control":"no-store"}
-          });
-        }
-      }
+      if (s.role === "guest" && protectedPage !== "admin.html") { const rr=await env.AUTH_DB.prepare(`SELECT restricted FROM auth_restrictions WHERE page=?`).bind(protectedPage).first(); if (Number(rr?.restricted)===1) return new Response("<h1>Page Restricted</h1><p>Admin ne is page ko Guest ke liye restrict kiya hai.</p><a href=\"/index.html\">Back to Dashboard</a>",{status:403,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}}); }
     }
 
     if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe"].includes(url.pathname)) {
