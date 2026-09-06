@@ -36,9 +36,11 @@
     background:linear-gradient(135deg,#3475e8,#6957d8);
     box-shadow:0 5px 14px rgba(52,117,232,.18);
 }
-.swing-conditions[hidden]{display:none}
+.swing-conditions[hidden],.bb-conditions[hidden]{display:none}
 
 @media(max-width:700px){
     .catch-tabs{width:100%;}
     .catch-tab{flex:1;justify-content:center;padding:10px 12px;}
 }
+
+.bb-conditions .condition-title{letter-spacing:-.1px}

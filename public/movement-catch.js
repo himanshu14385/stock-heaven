@@ -86,14 +86,48 @@ function renderSwing(d){
         condition('Relative strength vs NIFTY',rsDetail,relativeOk)
     ].join('');
 }
+function stddev(a){if(!a.length)return null;const m=a.reduce((x,y)=>x+y,0)/a.length;return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/a.length)}
+function renderBBIndi(d){
+    const {price,e20,vw,R,bbUpper,bbMiddle,bbLower,av,volume,res,sup,bbNearUpper,bbVolume,bbCandle,bbBreakout}=d;
+    const checks=[
+        price>e20,
+        vw!=null&&price>vw,
+        R!=null&&R>55,
+        bbNearUpper,
+        bbVolume,
+        bbCandle&&bbBreakout
+    ];
+    const score=checks.filter(Boolean).length;
+    const signal=score>=5?'BUY SETUP':score>=3?'WAIT':'AVOID';
+    let entry=bbBreakout?price:null;
+    if(bbBreakout&&res!=null) entry=Math.max(price,res);
+    const slBase=sup!=null?sup:null;
+    const bandStop=bbMiddle!=null?bbMiddle*0.995:null;
+    const sl=slBase!=null&&bandStop!=null?Math.min(slBase,bandStop):slBase!=null?slBase:bandStop;
+    const risk=entry!=null&&sl!=null&&sl<entry?entry-sl:null;
+    const target=res!=null&&res>entry?res:(risk!=null?entry+risk*2:null);
+    const rr=entry!=null&&risk!=null&&target!=null?(target-entry)/risk:null;
+    setSignal(signal,score,6,score>=5?'Trend, VWAP, momentum, Bollinger expansion and volume are aligned for a BB Indi move.':score>=3?'The BB Indi setup is developing. Wait for stronger breakout and confirmation.':'The current setup does not meet enough BB Indi confirmations.');
+    set('entry',fmt(entry));set('sl',fmt(sl));set('target',fmt(target));set('rr',rr?`1:${rr.toFixed(1)}`:'--');set('bbDataDate',d.as_of?`Data: ${d.as_of}`:'Daily data');
+    $('bbConditionList').innerHTML=[
+        condition('Price > 20 EMA',`${fmt(price)} vs ${fmt(e20)}`,price>e20),
+        condition('Price > VWAP',`${fmt(price)} vs ${fmt(vw)}`,vw!=null&&price>vw),
+        condition('RSI (14) > 55',`Current RSI ${R?.toFixed(1)||'--'}`,R!=null&&R>55),
+        condition('Upper Bollinger Band',`${fmt(price)} vs upper ${fmt(bbUpper)}`,bbNearUpper),
+        condition('Volume expansion',`${fmtN(volume)} vs 1.5× avg ${fmtN(av)}`,bbVolume),
+        condition('Strong candle + resistance breakout',bbBreakout?(bbCandle?'Bullish candle confirmed above the prior high.':'Breakout confirmed; candle strength is weak.'):(bbCandle?'Bullish candle, but resistance breakout is not confirmed.':'No strong bullish breakout candle yet.'),bbCandle&&bbBreakout)
+    ].join('');
+}
 function renderTab(){
     if(!currentData)return;
-    const swing=currentTab==='swing';
-    $('movementConditions').hidden=swing;
+    const swing=currentTab==='swing',bb=currentTab==='bbindi';
+    $('movementConditions').hidden=swing||bb;
     $('swingConditions').hidden=!swing;
+    $('bbConditions').hidden=!bb;
     renderSwingOrMovement();
 }
-function renderSwingOrMovement(){if(!currentData)return;currentTab==='swing'?renderSwing(currentData):renderMovement(currentData)}
+
+function renderSwingOrMovement(){if(!currentData)return;currentTab==='swing'?renderSwing(currentData):currentTab==='bbindi'?renderBBIndi(currentData):renderMovement(currentData)}
 async function analyze(symbol){
     const id=++req;
     symbol=(symbol||'').trim().toUpperCase();
@@ -126,10 +160,23 @@ async function analyze(symbol){
             vw=vwap20(h,l,c,v),
             atr14=atr(h,l,c,14);
 
+        const bbWindow=c.slice(-20);
+        const bbMiddle=bbWindow.length>=20?sma(bbWindow,20):null;
+        const bbStd=bbWindow.length>=20?stddev(bbWindow):null;
+        const bbUpper=bbMiddle!=null&&bbStd!=null?bbMiddle+2*bbStd:null;
+        const bbLower=bbMiddle!=null&&bbStd!=null?bbMiddle-2*bbStd:null;
+        const bbNearUpper=bbUpper!=null&&price>=bbUpper*0.99;
+        const bbVolume=Number.isFinite(av)&&Number(d.volume)>av*1.5;
+        const lastH=Number(h[h.length-1]),lastL=Number(l[l.length-1]),lastO=Number(d.open);
+        const range=lastH-lastL;
+        const body=Math.abs(price-lastO);
+        const bbCandle=Number.isFinite(lastO)&&Number.isFinite(lastH)&&Number.isFinite(lastL)&&range>0&&price>lastO&&body/range>=0.6&&price>=lastH*0.985;
+
         let prevHigh=h.slice(0,-1).slice(-20).filter(Number.isFinite),
             prevLow=l.slice(0,-1).slice(-20).filter(Number.isFinite),
             res=prevHigh.length?Math.max(...prevHigh):null,
             sup=prevLow.length?Math.min(...prevLow):null;
+        const bbBreakout=res!=null&&price>res;
 
         let trend=price>e20&&e20>e50,
             above20=price>e20,
@@ -162,7 +209,7 @@ async function analyze(symbol){
             relativeStrength=stockReturn20-niftyReturn20;
         }
 
-        currentData={...d,price,e20,e50,e200,R,av,vw,res,sup,volume:Number(d.volume),atr14,stockReturn20,niftyReturn20,relativeStrength,trend,above20,volBreak,rsiz,aboveVwap,breakout,retest,checks,score,entry,sl,target,rr};
+        currentData={...d,price,e20,e50,e200,R,av,vw,res,sup,volume:Number(d.volume),atr14,bbMiddle,bbUpper,bbLower,bbNearUpper,bbVolume,bbCandle,bbBreakout,stockReturn20,niftyReturn20,relativeStrength,trend,above20,volBreak,rsiz,aboveVwap,breakout,retest,checks,score,entry,sl,target,rr};
         set('symbol',symbol.replace(/\.NS$/,''));
         set('company',d.name||symbol);
         set('price',fmt(price));

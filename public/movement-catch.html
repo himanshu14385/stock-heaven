@@ -34,6 +34,7 @@
     <div class="catch-tabs" role="tablist" aria-label="Catch strategies">
         <button class="catch-tab active" data-tab="movement" role="tab" aria-selected="true"><i class="fa-solid fa-bolt"></i><span>Movement Catch</span></button>
         <button class="catch-tab" data-tab="swing" role="tab" aria-selected="false"><i class="fa-solid fa-chart-line"></i><span>Swing</span></button>
+        <button class="catch-tab" data-tab="bbindi" role="tab" aria-selected="false"><i class="fa-solid fa-chart-simple"></i><span>BB Indi</span></button>
     </div>
     <section class="movement-search card">
         <div class="search-heading"><div><h3>Find a Setup</h3><p>Enter a stock symbol to run the 7-point movement check.</p></div><span class="data-chip"><i class="fa-solid fa-database"></i> Market Data</span></div>
@@ -84,7 +85,10 @@
             <div id="swingConditionList" class="condition-list"></div>
         </section>
 
-
+        <section class="conditions-panel card bb-conditions" id="bbConditions" hidden>
+            <div class="panel-heading condition-heading"><div><div class="panel-label">BB INDI CHECK</div><h3>BB Indi Setup Conditions</h3></div><span id="bbDataDate" class="data-date">Daily data</span></div>
+            <div id="bbConditionList" class="condition-list"></div>
+        </section>
 
     </section>
 </main>
