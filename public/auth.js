@@ -19,6 +19,24 @@
   function isAdmin(){return role()==='admin'}
   function isGuest(){return role()==='guest'}
   async function logout(){try{await api('/api/auth/logout',{method:'POST',body:'{}'})}catch(_){} location.replace('/login.html')}
+  let activityInFlight=false, lastActivitySent=0;
+  async function recordActivity(){
+    if(!isGuest()||activityInFlight)return;
+    const now=Date.now();
+    if(now-lastActivitySent<30000)return;
+    lastActivitySent=now; activityInFlight=true;
+    try{
+      const data=await api('/api/auth/activity',{method:'POST',body:'{}'});
+      if(data?.expiresAt&&currentSession){currentSession.expiresAt=data.expiresAt;startGuestTimer();}
+    }catch(e){if(e.status===401){currentSession=null;location.replace('/login.html')}}
+    finally{activityInFlight=false;}
+  }
+  function setupActivityTracking(){
+    if(!isGuest())return;
+    const events=['click','keydown','scroll','touchstart','pointerdown','mousemove'];
+    const onActivity=()=>recordActivity();
+    events.forEach(ev=>window.addEventListener(ev,onActivity,{passive:true}));
+  }
   async function loginAdmin(user,pass){return api('/api/auth/login',{method:'POST',body:JSON.stringify({role:'admin',username:user,password:pass})})}
   async function loginGuest(user,pass){return api('/api/auth/login',{method:'POST',body:JSON.stringify({role:'guest',username:user,password:pass})})}
   async function guestCredentials(){return api('/api/admin/guest-credentials')}
@@ -66,6 +84,7 @@
       const boot=()=>{injectTopbar();disableGuestEditing()};
       if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
       startGuestTimer();
+      setupActivityTracking();
     }catch(e){readyResolve(null);showAuthError('Server authentication service se response nahi mil raha. Page ko refresh karke dobara try karein.')}
   }
   protect();
