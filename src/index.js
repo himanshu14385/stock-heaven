@@ -325,7 +325,7 @@ async function fetchDynamicPeers(symbol) {
 }
 
 
-const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","admin.html"]);
+const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","admin.html"]);
 const PROTECTED_PAGE_ALIASES = {
   "/": "index.html",
   "/index.html": "index.html",
@@ -334,6 +334,7 @@ const PROTECTED_PAGE_ALIASES = {
   "/alert.html": "alert.html",
   "/fav-stock.html": "fav-stock.html",
   "/movement-catch.html": "movement-catch.html",
+  "/crypto.html": "crypto.html",
   "/admin.html": "admin.html"
 };
 const GUEST_SESSION_SECONDS = 5 * 60;
@@ -371,7 +372,7 @@ async function authInit(env){
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
   // Do NOT create a default Guest account. The single Guest credential must be
   // explicitly provisioned through the Admin panel / D1.
-  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html"]){
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html"]){
     await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
   }
 }
@@ -448,7 +449,7 @@ async function authJson(request,env,url){
   if(url.pathname==='/api/admin/restrictions'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
     if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
-    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
   }
   if(url.pathname==='/api/admin/login-log'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
@@ -555,6 +556,27 @@ async function replaceFavoritesData(env,groups){
   (fresh.results||[]).forEach((g,i)=>{const src=gs[i]||{};(Array.isArray(src.stocks)?src.stocks:[]).forEach((x,j)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(symbol)ins.push(env.AUTH_DB.prepare(`INSERT INTO favorite_stocks(group_id,symbol,name,note,sort_order) VALUES (?,?,?,?,?)`).bind(g.id,symbol,String(x.name||symbol).trim(),String(x.note||""),j));});});
   if(ins.length)await env.AUTH_DB.batch(ins);
 }
+
+async function getCryptoData(env){
+  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS crypto_watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT,market TEXT NOT NULL UNIQUE,symbol TEXT NOT NULL,name TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,added_at TEXT NOT NULL)`).run();
+  const rows=await env.AUTH_DB.prepare(`SELECT id,market,symbol,name,sort_order,added_at FROM crypto_watchlist ORDER BY sort_order,id`).all();
+  return rows.results||[];
+}
+async function replaceCryptoData(env,items){
+  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS crypto_watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT,market TEXT NOT NULL UNIQUE,symbol TEXT NOT NULL,name TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,added_at TEXT NOT NULL)`).run();
+  const clean=[]; const seen=new Set();
+  for(const x of Array.isArray(items)?items:[]){
+    const market=String(x.market||'').trim().toUpperCase();
+    const symbol=String(x.symbol||market.replace(/INR$/,'')).trim().toUpperCase();
+    const name=String(x.name||symbol).trim();
+    if(!market||!symbol||seen.has(market)) continue;
+    seen.add(market); clean.push({market,symbol,name});
+  }
+  await env.AUTH_DB.prepare(`DELETE FROM crypto_watchlist`).run();
+  if(clean.length){
+    await env.AUTH_DB.batch(clean.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO crypto_watchlist(market,symbol,name,sort_order,added_at) VALUES (?,?,?,?,?)`).bind(x.market,x.symbol,x.name,i,nowIso())));
+  }
+}
 async function dataJson(request,env,url){
   if(!url.pathname.startsWith('/api/data/'))return null;
   const session=await currentAuth(request,env);if(!session)return json({error:'Authentication required'},401);
@@ -568,6 +590,11 @@ async function dataJson(request,env,url){
     if(request.method==='GET')return json({items:await getAlertsData(env)});
     if(!admin)return json({error:'Admin only'},403);
     if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceAlertsData(env,b.items);return json({ok:true,items:await getAlertsData(env)});}
+  }
+  if(url.pathname==='/api/data/crypto'){
+    if(request.method==='GET')return json({items:await getCryptoData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceCryptoData(env,b.items);return json({ok:true,items:await getCryptoData(env)});}
   }
   if(url.pathname==='/api/data/favorites'){
     if(request.method==='GET')return json({groups:await getFavoritesData(env)});
@@ -608,9 +635,53 @@ export default {
       }
     }
 
-    if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe"].includes(url.pathname)) {
+    if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe","/api/crypto/markets","/api/crypto/ticker"].includes(url.pathname)) {
       const s = await currentAuth(request, env);
       if (!s) return json({error:"Authentication required"},401);
+    }
+
+    if (url.pathname === "/api/crypto/markets") {
+      try {
+        const r = await fetch("https://api.coindcx.com/exchange/v1/markets_details", {
+          headers: { "Accept": "application/json" },
+          cache: "no-store"
+        });
+        if (!r.ok) return json({ error: "Crypto market list unavailable" }, 502);
+        const items = await r.json();
+        const results = (Array.isArray(items) ? items : [])
+          .filter(x => String(x.base_currency_short_name || '').toUpperCase() === 'INR')
+          .filter(x => String(x.status || 'active').toLowerCase() !== 'inactive')
+          .map(x => ({
+            market: String(x.coindcx_name || '').toUpperCase(),
+            symbol: String(x.target_currency_short_name || '').toUpperCase(),
+            name: x.target_currency_name || x.target_currency_short_name || x.coindcx_name
+          }))
+          .filter(x => x.market && x.symbol)
+          .sort((a,b)=>a.symbol.localeCompare(b.symbol));
+        return json({ results });
+      } catch (_) { return json({ error: "Unable to search crypto markets" }, 502); }
+    }
+
+    if (url.pathname === "/api/crypto/ticker") {
+      const requested = String(url.searchParams.get('markets') || url.searchParams.get('market') || '')
+        .split(',').map(x=>x.trim().toUpperCase()).filter(Boolean).slice(0,30);
+      if (!requested.length) return json({ error: "Crypto market missing" }, 400);
+      try {
+        const [tickerResp, detailsResp] = await Promise.all([
+          fetch("https://api.coindcx.com/exchange/ticker", { headers: { "Accept": "application/json" }, cache: "no-store" }),
+          fetch("https://api.coindcx.com/exchange/v1/markets_details", { headers: { "Accept": "application/json" }, cache: "no-store" })
+        ]);
+        if (!tickerResp.ok) return json({ error: "Crypto ticker unavailable" }, 502);
+        const tickers = await tickerResp.json();
+        const details = detailsResp.ok ? await detailsResp.json() : [];
+        const names = new Map((Array.isArray(details)?details:[]).map(x=>[String(x.coindcx_name||'').toUpperCase(), x]));
+        const wanted = new Set(requested);
+        const results = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
+          const market=String(x.market||'').toUpperCase(), d=names.get(market)||{};
+          return { market, symbol:String(d.target_currency_short_name||market.replace(/INR$/,'')), name:d.target_currency_name||d.target_currency_short_name||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp };
+        });
+        return json({ results: requested.length===1 ? (results[0]||null) : results });
+      } catch (_) { return json({ error: "Unable to fetch crypto prices" }, 502); }
     }
 
     if (url.pathname === "/api/search") {
