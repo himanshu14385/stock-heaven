@@ -26,11 +26,15 @@
         <a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
         <a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
         <a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
-        <a href="movement-catch.html" class="nav-item active"><i class="fa-solid fa-bolt"></i><span>Movement Catch</span></a>
+        <a href="movement-catch.html" class="nav-item active"><i class="fa-solid fa-bolt"></i><span>Catch</span></a>
     </div>
 </nav>
 
 <main class="movement-main">
+    <div class="catch-tabs" role="tablist" aria-label="Catch strategies">
+        <button class="catch-tab active" data-tab="movement" role="tab" aria-selected="true"><i class="fa-solid fa-bolt"></i><span>Movement Catch</span></button>
+        <button class="catch-tab" data-tab="swing" role="tab" aria-selected="false"><i class="fa-solid fa-chart-line"></i><span>Swing</span></button>
+    </div>
     <section class="movement-search card">
         <div class="search-heading"><div><h3>Find a Setup</h3><p>Enter a stock symbol to run the 7-point movement check.</p></div><span class="data-chip"><i class="fa-solid fa-database"></i> Market Data</span></div>
         <div class="movement-search-row">
@@ -70,9 +74,14 @@
             </section>
         </div>
 
-        <section class="conditions-panel card">
+        <section class="conditions-panel card" id="movementConditions">
             <div class="panel-heading condition-heading"><div><div class="panel-label">7-POINT CHECK</div><h3>Setup Conditions</h3></div><span id="dataDate" class="data-date">Daily data</span></div>
             <div id="conditionList" class="condition-list"></div>
+        </section>
+
+        <section class="conditions-panel card swing-conditions" id="swingConditions" hidden>
+            <div class="panel-heading condition-heading"><div><div class="panel-label">SWING CHECK</div><h3>Swing Setup Conditions</h3></div><span id="swingDataDate" class="data-date">Daily data</span></div>
+            <div id="swingConditionList" class="condition-list"></div>
         </section>
 
 
