@@ -1,5 +1,5 @@
 (function(){
-  const pages=[['index.html','Dashboard','Main stock analysis'],['stuck-stock.html','Stuck Stock','Saved stuck-stock positions'],['summary.html','Summary','Stock summary and comparison'],['alert.html','Alert','Price alert list'],['fav-stock.html','Fav Stock','Favourite stock cards'],['movement-catch.html','Movement Catch','Technical breakout setup scanner']];
+  const pages=[['index.html','Dashboard','Main stock analysis'],['stuck-stock.html','Stuck Stock','Saved stuck-stock positions'],['summary.html','Summary','Stock summary and comparison'],['alert.html','Alert','Price alert list'],['fav-stock.html','Fav Stock','Favourite stock cards'],['movement-catch.html','Catch','Technical breakout setup scanner'],['crypto.html','Crypto','CoinDCX INR live prices']];
   const $=id=>document.getElementById(id);
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const db={alerts:[],stuck:[],favorites:[]};

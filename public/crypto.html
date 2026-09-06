@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto • Stock Heaven</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="crypto.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="auth.css">
+<script src="auth.js"></script>
+</head>
+<body>
+<div class="page">
+<header class="top-header">
+    <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div><h1>Stock Heaven</h1><p>Smart Stock Analysis</p></div>
+    </div>
+</header>
+<nav class="main-nav">
+    <div class="nav-inner">
+        <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+        <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+        <a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+        <a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+        <a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
+        <a href="movement-catch.html" class="nav-item"><i class="fa-solid fa-bolt"></i><span>Catch</span></a>
+        <a href="crypto.html" class="nav-item active"><i class="fa-brands fa-bitcoin"></i><span>Crypto</span></a>
+    </div>
+</nav>
+<main class="crypto-main">
+    <section class="crypto-search card">
+        <div class="search-heading">
+            <div><h3>Crypto Prices</h3><p>Search and add CoinDCX INR coins to your live watchlist.</p></div>
+            <span class="data-chip"><i class="fa-solid fa-bolt"></i> Live INR</span>
+        </div>
+        <div class="crypto-search-row">
+            <div class="crypto-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="cryptoInput" autocomplete="off" placeholder="Search coin e.g. BTC, ETH, SOL">
+                <div id="cryptoSuggestions" class="suggestions"></div>
+            </div>
+            <button id="cryptoAddBtn" class="crypto-add"><i class="fa-solid fa-plus"></i> Add Coin</button>
+        </div>
+        <div id="cryptoStatus" class="crypto-status"></div>
+    </section>
+    <section class="crypto-watch card">
+        <div class="crypto-watch-head"><div><div class="panel-label">LIVE WATCHLIST</div><h3>INR Crypto Prices</h3></div><span id="cryptoRefresh" class="crypto-refresh"><i class="fa-solid fa-arrows-rotate"></i> Auto refresh</span></div>
+        <div id="cryptoList" class="crypto-list"></div>
+    </section>
+</main>
+</div>
+<script src="crypto.js"></script>
+</body>
+</html>
