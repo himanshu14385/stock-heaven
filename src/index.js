@@ -519,16 +519,35 @@ async function replaceAlertsData(env,items){
   arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const raw=String(x.alertPrice??"").trim();const target=raw===""?null:Number(raw);stm.push(env.AUTH_DB.prepare(`INSERT INTO alerts(symbol,name,target_price,sort_order) VALUES (?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),Number.isFinite(target)?target:null,i));});
   await env.AUTH_DB.batch(stm);
 }
+let favoriteSchemaReady = null;
+async function ensureFavoriteSchema(env){
+  if(favoriteSchemaReady) return favoriteSchemaReady;
+  favoriteSchemaReady = (async()=>{
+    const info = await env.AUTH_DB.prepare(`PRAGMA table_info(favorite_groups)`).all();
+    const cols = new Set((info.results||[]).map(x=>x.name));
+    if(!cols.has('identity')){
+      try {
+        await env.AUTH_DB.prepare(`ALTER TABLE favorite_groups ADD COLUMN identity TEXT NOT NULL DEFAULT 'favourite'`).run();
+      } catch(e){
+        const msg=String(e?.message||e).toLowerCase();
+        if(!msg.includes('duplicate column')) throw e;
+      }
+    }
+  })().catch(e=>{favoriteSchemaReady=null;throw e;});
+  return favoriteSchemaReady;
+}
 async function getFavoritesData(env){
-  const gr=await env.AUTH_DB.prepare(`SELECT id,title,sort_order,collapsed FROM favorite_groups ORDER BY sort_order,id`).all();
+  await ensureFavoriteSchema(env);
+  const gr=await env.AUTH_DB.prepare(`SELECT id,title,identity,sort_order,collapsed FROM favorite_groups ORDER BY sort_order,id`).all();
   const sr=await env.AUTH_DB.prepare(`SELECT id,group_id,symbol,name,note,sort_order FROM favorite_stocks ORDER BY group_id,sort_order,id`).all();
   const stocks=sr.results||[];
-  return (gr.results||[]).map(g=>({id:g.id,title:g.title,collapsed:!!g.collapsed,stocks:stocks.filter(s=>s.group_id===g.id).map(s=>({id:s.id,symbol:s.symbol,name:s.name||s.symbol,note:s.note||""}))}));
+  return (gr.results||[]).map(g=>({id:g.id,title:g.title,identity:g.identity||'favourite',collapsed:!!g.collapsed,stocks:stocks.filter(s=>s.group_id===g.id).map(s=>({id:s.id,symbol:s.symbol,name:s.name||s.symbol,note:s.note||""}))}));
 }
 async function replaceFavoritesData(env,groups){
+  await ensureFavoriteSchema(env);
   const gs=Array.isArray(groups)?groups:[];
   const stm=[env.AUTH_DB.prepare(`DELETE FROM favorite_stocks`),env.AUTH_DB.prepare(`DELETE FROM favorite_groups`)];
-  gs.forEach((g,i)=>{const title=String(g.title||"").trim();if(title)stm.push(env.AUTH_DB.prepare(`INSERT INTO favorite_groups(title,sort_order,collapsed) VALUES (?,?,?)`).bind(title,i,g.collapsed?1:0));});
+  gs.forEach((g,i)=>{const title=String(g.title||"").trim();if(title)stm.push(env.AUTH_DB.prepare(`INSERT INTO favorite_groups(title,sort_order,collapsed,identity) VALUES (?,?,?,?)`).bind(title,i,g.collapsed?1:0,String(g.identity||g.icon_key||'favourite')));});
   await env.AUTH_DB.batch(stm);
   const fresh=await env.AUTH_DB.prepare(`SELECT id,sort_order FROM favorite_groups ORDER BY sort_order,id`).all();
   const ins=[];
