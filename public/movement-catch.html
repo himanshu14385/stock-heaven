@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Movement Catch · Stock Heaven</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="movement-catch.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="auth.css"><script src="auth.js"></script>
+</head>
+<body>
+<header class="top-header"><div class="brand"><div class="brand-logo"><i class="fa-solid fa-chart-line"></i></div><div><div class="brand-name">Stock Heaven</div><div class="brand-sub">Smart Stock Analysis</div></div></div><div class="header-actions"><span id="sessionBadge"></span><button id="logoutBtn" class="header-btn">Logout</button></div></header>
+<nav class="main-nav"><div class="nav-inner">
+<a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+<a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+<a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+<a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+<a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
+<a href="movement-catch.html" class="nav-item active"><i class="fa-solid fa-crosshairs"></i><span>Movement Catch</span></a>
+</div></nav>
+<main class="movement-page">
+<section class="movement-hero"><div><span class="kicker">TECHNICAL SETUP SCANNER</span><h1>Movement Catch</h1><p>Find a potential breakout setup using trend, volume, RSI, VWAP, resistance and retest confirmation.</p></div><div class="timeframe"><span>Timeframe</span><strong>Daily</strong></div></section>
+<section class="search-card"><div class="search-label"><i class="fa-solid fa-magnifying-glass"></i> Search Stock</div><div class="search-row"><div class="search-wrap"><input id="movementInput" autocomplete="off" placeholder="Search stock e.g. RELIANCE, TCS, HDFCBANK"><div id="movementSuggestions" class="suggestions"></div></div><button id="analyzeBtn" class="analyze-btn"><i class="fa-solid fa-bolt"></i> Analyze Setup</button></div><div id="status" class="status"></div></section>
+<section id="result" class="result" hidden>
+<div class="stock-head"><div><div class="symbol" id="symbol">--</div><div class="company" id="company">--</div></div><div class="price-box"><strong id="price">₹--</strong><span id="change">--</span></div></div>
+<div class="signal-grid"><div class="signal-card" id="signalCard"><div class="signal-kicker">SETUP SIGNAL</div><div id="signal" class="signal">WAIT</div><p id="signalText">Waiting for analysis.</p><div class="score"><strong id="score">0/7</strong><span>conditions passed</span></div></div><div class="trade-card"><div class="card-title">Trade Plan</div><div class="trade-grid"><div><span>Entry</span><strong id="entry">--</strong></div><div><span>Stop Loss</span><strong id="sl">--</strong></div><div><span>Target</span><strong id="target">--</strong></div><div><span>Risk : Reward</span><strong id="rr">--</strong></div></div><small>Reference levels only. Confirm price action before taking a trade.</small></div></div>
+<div class="conditions"><div class="section-title"><div><span class="kicker">7-POINT CHECK</span><h2>Setup Conditions</h2></div><span id="dataDate" class="data-date">--</span></div><div id="conditionList" class="condition-list"></div></div>
+<div class="levels"><div class="level-card"><span>20 EMA</span><strong id="ema20">--</strong></div><div class="level-card"><span>50 EMA</span><strong id="ema50">--</strong></div><div class="level-card"><span>RSI (14)</span><strong id="rsi">--</strong></div><div class="level-card"><span>20D Avg Volume</span><strong id="avgVol">--</strong></div><div class="level-card"><span>20D VWAP Proxy</span><strong id="vwap">--</strong></div><div class="level-card"><span>Resistance</span><strong id="resistance">--</strong></div><div class="level-card"><span>Support</span><strong id="support">--</strong></div><div class="level-card"><span>Current Volume</span><strong id="volume">--</strong></div></div>
+<div class="method-note"><i class="fa-solid fa-circle-info"></i><div><strong>How the signal works</strong><p>BUY SETUP needs 6–7 of 7 checks. WAIT means the setup is developing but confirmation is missing. AVOID means the trend/setup is currently weak. The daily VWAP is shown as a 20-session VWAP proxy; true intraday VWAP requires intraday candles.</p></div></div>
+</section>
+</main>
+<script src="movement-catch.js"></script>
+</body></html>

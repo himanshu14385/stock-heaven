@@ -1,6 +1,6 @@
 (function(){
   const currentFile=(location.pathname.split('/').pop()||'index.html').toLowerCase();
-  const pages={'index.html':'Dashboard','stuck-stock.html':'Stuck Stock','summary.html':'Summary','alert.html':'Alert','fav-stock.html':'Fav Stock'};
+  const pages={'index.html':'Dashboard','stuck-stock.html':'Stuck Stock','summary.html':'Summary','alert.html':'Alert','fav-stock.html':'Fav Stock','movement-catch.html':'Movement Catch'};
   let currentSession=null, sessionTimer=null, booted=false;
   let readyResolve;
   const ready=new Promise(resolve=>{readyResolve=resolve});
