@@ -460,15 +460,6 @@ async function authJson(request,env,url){
 }
 
 
-const DEFAULT_STUCK = [
-  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"208 × 647.73"},
-  {symbol:"ADANIENSOL",name:"Adani Energy Solutions Limited",stuckInfo:"33 × 2788.12"},
-  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"36 × 683.35"},
-  {symbol:"ADANIGREEN",name:"Adani Green Energy",stuckInfo:"9 × 2333.43"},
-  {symbol:"FMCGIETF.NS",name:"ICICI Pru Nifty FMCG ETF",stuckInfo:"550 × 56.07"},
-  {symbol:"TMPV",name:"Tata Motors Passenger Vehicles",stuckInfo:"27 × 508.60"},
-  {symbol:"NSLNISP",name:"NMDC Steel",stuckInfo:"31 × 52.85"}
-];
 const DEFAULT_ALERTS = [
  {symbol:"AWL",name:"AWL",alertPrice:""},{symbol:"ADANIENSOL",name:"ADANIENSOL",alertPrice:""},
  {symbol:"ADANIGREEN",name:"ADANIGREEN",alertPrice:""},{symbol:"NSLNISP",name:"NMDC Steel",alertPrice:""},
@@ -488,13 +479,8 @@ async function ensureStuckSchema(env){
 }
 async function getStuckData(env){
   await ensureStuckSchema(env);
-  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
-  if(!(rows.results||[]).length){
-    const stm=DEFAULT_STUCK.map((x,i)=>{const p=parseStuckInfo(x.stuckInfo);return env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(x.symbol,x.name,p.quantity,p.buyPrice,i)});
-    await env.AUTH_DB.batch(stm);
-    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
-  }
-  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,stuckInfo:`${r.quantity} × ${Number(r.buy_price).toFixed(2)}`}));
+  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
+  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,stuckInfo:`${r.quantity} × ${Number(r.buy_price).toFixed(2)}`,sort_order:Number(r.sort_order||0)}));
 }
 async function replaceStuckData(env,items){
   await ensureStuckSchema(env);
@@ -604,6 +590,17 @@ async function dataJson(request,env,url){
       return json({ok:true,items:await getStuckData(env)});
     }
     if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceStuckData(env,b.items);return json({ok:true,items:await getStuckData(env)});}
+    if(request.method==='PATCH'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};
+      const order=Array.isArray(b.order)?b.order.map(Number).filter(Number.isInteger):[];
+      if(!order.length)return json({error:'Order is required'},400);
+      await ensureStuckSchema(env);
+      const rows=await env.AUTH_DB.prepare(`SELECT id FROM stuck_stocks ORDER BY sort_order,id`).all();
+      const existing=(rows.results||[]).map(r=>Number(r.id));
+      if(order.length!==existing.length || new Set(order).size!==existing.length || order.some(id=>!existing.includes(id))) return json({error:'Invalid stock order'},400);
+      await env.AUTH_DB.batch(order.map((id,i)=>env.AUTH_DB.prepare(`UPDATE stuck_stocks SET sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(i,id)));
+      return json({ok:true,items:await getStuckData(env)});
+    }
   }
   if(url.pathname==='/api/data/alerts'){
     if(request.method==='GET')return json({items:await getAlertsData(env)});
