@@ -678,7 +678,13 @@ export default {
         const wanted = new Set(requested);
         const baseResults = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
           const market=String(x.market||'').toUpperCase(), d=names.get(market)||{};
-          return { market, symbol:String(d.target_currency_short_name||market.replace(/INR$/,'')), name:d.target_currency_name||d.target_currency_short_name||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp, pair:d.pair||null };
+          const target=String(d.target_currency_short_name||market.replace(/INR$/,'')).toUpperCase();
+          const base=String(d.base_currency_short_name||'INR').toUpperCase();
+          // CoinDCX documents `pair` in markets_details. Keep it when present,
+          // but build the spot INR pair as a fallback because some market-detail
+          // responses can omit the pair field. For INR spot markets this is I-COIN_INR.
+          const pair=d.pair || `${String(d.ecode||'I').toUpperCase()}-${target}_${base}`;
+          return { market, symbol:target, name:d.target_currency_name||target||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp, pair };
         });
 
         // CoinDCX ticker gives only 24H high/low. Calculate 1Y high/low
@@ -688,7 +694,7 @@ export default {
           try{
             const endTime=Date.now();
             const startTime=endTime-(365*24*60*60*1000);
-            const candleUrl=`https://api.coindcx.com/market_data/candles?pair=${encodeURIComponent(item.pair)}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=366`;
+            const candleUrl=`https://api.coindcx.com/market_data/candles?pair=${encodeURIComponent(item.pair)}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=1000`;
             const cr=await fetch(candleUrl,{headers:{"Accept":"application/json"},cache:"no-store"});
             if(!cr.ok) return {...item,year_high:null,year_low:null};
             const candles=await cr.json().catch(()=>[]);
