@@ -251,7 +251,7 @@ async function addStuckStock() {
 
 document.addEventListener("keydown", handleAddStuckKey);
 
-let draggedStuckIndex = null;
+let draggedStuckId = null;
 let stuckReorderSaving = false;
 
 function bindStuckDragDrop() {
@@ -268,93 +268,83 @@ function bindStuckDragDrop() {
             }
             const card = handle.closest(".stuck-stock-row");
             if (!card) return;
-            draggedStuckIndex = Number(card.dataset.stuckIndex);
+            draggedStuckId = String(card.dataset.stuckId || "");
             card.classList.add("stuck-dragging");
             event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", String(draggedStuckIndex));
+            event.dataTransfer.setData("text/plain", draggedStuckId);
         });
         handle.addEventListener("dragend", () => {
-            draggedStuckIndex = null;
+            draggedStuckId = null;
             cards.forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
         });
     });
 
     cards.forEach(card => {
         card.addEventListener("dragover", event => {
-            if (draggedStuckIndex === null) return;
+            if (!draggedStuckId || String(card.dataset.stuckId || "") === draggedStuckId) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
+            cards.forEach(c => c.classList.remove("stuck-drag-over"));
             card.classList.add("stuck-drag-over");
         });
-        card.addEventListener("dragleave", () => card.classList.remove("stuck-drag-over"));
+        card.addEventListener("dragleave", event => {
+            if (!card.contains(event.relatedTarget)) card.classList.remove("stuck-drag-over");
+        });
         card.addEventListener("drop", async event => {
             event.preventDefault();
+            event.stopPropagation();
             card.classList.remove("stuck-drag-over");
-            const from = draggedStuckIndex;
-            const to = Number(card.dataset.stuckIndex);
-            draggedStuckIndex = null;
-            if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) return;
-            await reorderStuckByDrag(from, to);
+
+            const fromId = draggedStuckId || event.dataTransfer.getData("text/plain");
+            draggedStuckId = null;
+            if (!fromId) return;
+
+            const fromCard = container.querySelector(`.stuck-stock-row[data-stuck-id="${CSS.escape(String(fromId))}"]`);
+            if (!fromCard || fromCard === card) return;
+
+            // Move the actual card in the DOM immediately. This makes the
+            // reorder visible at the exact moment of drop; no price reload.
+            const rect = card.getBoundingClientRect();
+            const before = event.clientY < rect.top + rect.height / 2;
+            if (before) container.insertBefore(fromCard, card);
+            else container.insertBefore(fromCard, card.nextSibling);
+
+            // Rebuild the in-memory order from the DOM, then persist it.
+            const orderedIds = Array.from(container.querySelectorAll(".stuck-stock-row"))
+                .map(c => String(c.dataset.stuckId || ""));
+            const byId = new Map(stuckStocks.map(stock => [String(stock.id ?? ""), stock]));
+            stuckStocks = orderedIds.map(id => byId.get(id)).filter(Boolean);
+            Array.from(container.querySelectorAll(".stuck-stock-row")).forEach((c, i) => {
+                c.dataset.stuckIndex = String(i);
+            });
+
+            await persistStuckOrder(orderedIds);
         });
     });
 }
 
-function applyStuckDomOrder() {
-    const container = document.getElementById("stuckStockList");
-    if (!container) return;
-
-    // Cards themselves are not draggable; only the left grip is. Use the
-    // card class here so the already-rendered cards can be reordered instantly.
-    const cards = Array.from(container.querySelectorAll(".stuck-stock-row"));
-    const byId = new Map(cards.map(card => [String(card.dataset.stuckId || ""), card]));
-
-    stuckStocks.forEach((stock, index) => {
-        const card = byId.get(String(stock.id ?? ""));
-        if (!card) return;
-        card.dataset.stuckIndex = String(index);
-        container.appendChild(card);
-    });
-}
-
-async function reorderStuckByDrag(from, to) {
-    if (!window.requireAdmin() || stuckReorderSaving) return;
-    if (from < 0 || from >= stuckStocks.length || to < 0 || to >= stuckStocks.length) return;
-
-    const previous = [...stuckStocks];
-    const next = [...stuckStocks];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-
-    // Optimistic UI: move the existing cards immediately. Do not reload or
-    // refetch prices, so the live price stays attached to its stock card.
-    stuckStocks = next;
-    applyStuckDomOrder();
+async function persistStuckOrder(order) {
+    if (!window.requireAdmin() || stuckReorderSaving || !Array.isArray(order) || order.length < 2) return;
     stuckReorderSaving = true;
-
     try {
         const response = await fetch('/api/data/stuck', {
             method: 'PATCH',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             cache: 'no-store',
-            body: JSON.stringify({ order: next.map(stock => stock.id) })
+            body: JSON.stringify({ order })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.error) throw new Error(data.error || 'Reorder failed');
-
-        // Keep the already-rendered cards and their prices. The server response
-        // only confirms/synchronizes the saved order; no price reload is needed.
-        if (Array.isArray(data.items) && data.items.length === next.length) {
+        // Do not reload cards/prices. The DOM is already in the correct order.
+        if (Array.isArray(data.items) && data.items.length === stuckStocks.length) {
             const serverById = new Map(data.items.map(item => [String(item.id), item]));
-            stuckStocks = next.map(stock => serverById.get(String(stock.id)) || stock);
+            stuckStocks = order.map(id => serverById.get(String(id))).filter(Boolean);
         }
-        applyStuckDomOrder();
     } catch (error) {
-        // Revert only the order. Do not call loadStuckStocks(), because that
-        // would refetch every price and show the loading state again.
-        stuckStocks = previous;
-        applyStuckDomOrder();
-        alert(error.message || 'Reorder failed');
+        // Keep the immediate visual reorder. The next normal data load will
+        // reconcile with the server if the persistence request failed.
+        console.error('Stuck Stock reorder save failed:', error);
     } finally {
         stuckReorderSaving = false;
     }
