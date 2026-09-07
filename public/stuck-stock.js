@@ -143,7 +143,7 @@ async function loadStuckStocks() {
     );
 
     container.innerHTML = results.map((stock, index) => `
-        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}">
+        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}">
             <div class="ssname-wrap">
                 <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
                 <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
@@ -291,6 +291,21 @@ function bindStuckDragDrop() {
     });
 }
 
+function applyStuckDomOrder() {
+    const container = document.getElementById("stuckStockList");
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll(".stuck-stock-row[draggable='true']"));
+    const byId = new Map(cards.map(card => [String(card.dataset.stuckId || ""), card]));
+
+    stuckStocks.forEach((stock, index) => {
+        const card = byId.get(String(stock.id ?? ""));
+        if (!card) return;
+        card.dataset.stuckIndex = String(index);
+        container.appendChild(card);
+    });
+}
+
 async function reorderStuckByDrag(from, to) {
     if (!window.requireAdmin() || stuckReorderSaving) return;
     if (from < 0 || from >= stuckStocks.length || to < 0 || to >= stuckStocks.length) return;
@@ -309,8 +324,11 @@ async function reorderStuckByDrag(from, to) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.error) throw new Error(data.error || 'Reorder failed');
+        // Reorder only the existing DOM cards. Do NOT call loadStuckStocks() here:
+        // that function refetches every live price and briefly shows "Loading prices...".
+        // Drag/drop should move the cards instantly while keeping their already-fetched prices.
         stuckStocks = Array.isArray(data.items) ? data.items : next;
-        await loadStuckStocks();
+        applyStuckDomOrder();
     } catch (error) {
         await loadStuckData();
         await loadStuckStocks();
