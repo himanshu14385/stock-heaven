@@ -60,9 +60,40 @@
     return `<div class="tech-item tech-${type}"><div class="tech-label">${esc(label)}</div><div class="tech-value">${esc(value)}</div><span class="tech-tag">${esc(status)}</span></div>`;
   }
 
-  async function api(path){
-    const r=await fetch(path,{cache:'no-store'}); const d=await r.json().catch(()=>({}));
+  async function api(path, options={}){
+    const r=await fetch(path,{cache:'no-store',credentials:'same-origin',...options});
+    const d=await r.json().catch(()=>({}));
     if(!r.ok||d.error)throw new Error(d.error||`Request failed (${r.status})`); return d;
+  }
+
+  async function loadSavedStocks(){
+    setStatus('Loading saved stocks…');
+    try{
+      const d=await api('/api/data/buy-zone');
+      const items=Array.isArray(d.items)?d.items:[];
+      stocks.length=0;
+      items.slice(0,MAX_STOCKS).forEach(x=>stocks.push({id:x.id,symbol:String(x.symbol||'').toUpperCase(),name:x.name||x.symbol,loading:true}));
+      render();
+      if(!stocks.length){setStatus('No stocks saved yet.');return;}
+      await Promise.all(stocks.map(async e=>{
+        try{
+          const [stock,peers]=await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(e.symbol)}`),api(`/api/peers?symbol=${encodeURIComponent(e.symbol)}`).catch(()=>({}))]);
+          e.data=stock;e.peers=peers;e.loading=false;e.analysis=buildAnalysis(e);
+        }catch(err){e.loading=false;e.refreshError=err.message||'Unable to analyse';}
+      }));
+      lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();setStatus('Saved stocks loaded.');
+    }catch(e){
+      render();
+      setStatus(e.message||'Unable to load saved stocks',true);
+    }
+  }
+
+  async function saveStocks(){
+    const items=stocks.map(x=>({symbol:x.symbol,name:x.name}));
+    const d=await api('/api/data/buy-zone',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    const saved=Array.isArray(d.items)?d.items:[];
+    saved.forEach((x,i)=>{if(stocks[i])stocks[i].id=x.id;});
+    return d;
   }
 
   async function searchStocks(q){
@@ -85,13 +116,15 @@
     if(stocks.length>=MAX_STOCKS){setStatus('Maximum 15 stocks reached.',true);return;}
     const symbol=String(item.symbol||'').trim().toUpperCase().replace(/\.NS$/i,''); if(!symbol)return;
     if(stocks.some(x=>x.symbol===symbol)){setStatus(`${symbol} is already added.`,true);return;}
-    const entry={symbol,name:item.name||symbol,loading:true}; stocks.push(entry); render();
+    const entry={symbol,name:item.name||symbol,loading:true}; stocks.push(entry); render(); setStatus(`Analysing ${symbol}…`);
     try{
-      const [stock, peers] = await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(symbol)}`), api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))]);
-      entry.data=stock; entry.peers=peers; entry.loading=false; entry.analysis=buildAnalysis(entry); lastUpdated=new Date(); $('lastUpdated').textContent=fmtTime();
-      render(); setStatus(`${symbol} added.`);
+      const [stock,peers] = await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(symbol)}`), api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))]);
+      entry.data=stock; entry.peers=peers; entry.loading=false; entry.analysis=buildAnalysis(entry);
+      await saveStocks();
+      lastUpdated=new Date(); $('lastUpdated').textContent=fmtTime();
+      render(); setStatus(`${symbol} added and saved to database.`);
     }catch(e){
-      const idx=stocks.indexOf(entry);if(idx>=0)stocks.splice(idx,1);render();setStatus(`${symbol}: ${e.message||'Unable to analyse'}`,true);
+      const idx=stocks.indexOf(entry);if(idx>=0)stocks.splice(idx,1);render();setStatus(`${symbol}: ${e.message||'Unable to analyse/save'}`,true);
     }
   }
 
@@ -124,7 +157,11 @@
       body.insertAdjacentHTML('beforeend', rowHtml(entry,i));
     });
     $('countAll').textContent=stocks.length;$('countBuy').textContent=counts.BUY||0;$('countHold').textContent=counts.HOLD||0;$('countSell').textContent=counts.SELL||0;$('countStrong').textContent=counts['STRONG BUY']||0;
-    body.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.delete);stocks.splice(i,1);render();}));
+    body.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',async()=>{
+      const i=Number(b.dataset.delete); const removed=stocks[i]; if(!removed)return;
+      stocks.splice(i,1); render(); setStatus('Saving…');
+      try{await saveStocks();setStatus(`${removed.symbol} removed.`);}catch(e){stocks.splice(i,0,removed);render();setStatus(e.message||'Unable to save changes',true);}
+    }));
   }
 
   function logoUrl(symbol){return `https://cdn.simpleicons.org/${encodeURIComponent(String(symbol).toLowerCase())}`;}
@@ -148,13 +185,13 @@
     const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad'; const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
     const trendType=t.trend==='Uptrend'?'good':t.trend==='Downtrend'?'bad':'warn';
     const currentClass=a.zoneClass==='hold'?'view-hold':a.zoneClass==='sell'?'view-sell':'';
+    const currentView=a.zoneClass==='hold'?'HOLD':a.zoneClass==='sell'?'SELL':'BUY';
     return `<tr>
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
       <td><div class="price-main">${money(price)}</div><div class="price-change ${ch!=null&&ch>=0?'up':'down'}">${ch==null?'—':(ch>=0?'+':'')+fixed(ch)} (${pct==null?'—':(pct>=0?'+':'')+fixed(pct,2)+'%'})</div></td>
       <td><span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span><div class="zone-range">Fair: <b>${money(a.fairValue)}</b></div></td>
-      <td><div class="zone-bar"><span class="marker" style="left:${markerPos(a)}%"></span></div><div class="zone-value">${esc(zoneRange(a))}</div></td>
-      <td><div class="view-box ${currentClass}"><div class="view-icon"><i class="fa-solid fa-bullseye"></i></div><div class="view-text">Current View<b>${esc(a.zone)}</b></div></div></td>
+      <td><div class="view-box ${currentClass}"><div class="view-icon"><i class="fa-solid fa-bullseye"></i></div><div class="view-text">Current View<b>${currentView}</b></div></div></td>
       <td><div class="tech-grid">
         ${techCell('RSI (14)',fixed(t.rsi,1),rsiStatus,rsiType)}
         ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',macBull?'Bullish':'Bearish',macType)}
@@ -169,13 +206,6 @@
     </tr>`;
   }
 
-  function exportCsv(){
-    if(!stocks.length){setStatus('Nothing to export.',true);return;}
-    const rows=[['#','Stock','Symbol','Price','Change','Change %','Zone','Fair Value','PE','Peer PE','RSI','MACD','SMA20','SMA50','SMA200','Bollinger','VWAP','Volume Ratio']];
-    stocks.forEach((e,i)=>{if(!e.analysis)return;const a=e.analysis,t=a.t;rows.push([i+1,e.name,e.symbol,t.price,e.data.change,e.data.percent_change,a.zone,a.fairValue,a.selectedPe,a.peerPe,t.rsi,t.macd?.hist,t.s20,t.s50,t.s200,t.bb?`${t.bb.lower}-${t.bb.upper}`:'',t.vw,t.vr]);});
-    const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='stock-heaven-analysis.csv';a.click();URL.revokeObjectURL(url);
-  }
 
   async function refreshAll(){
     if(!stocks.length){setStatus('Add stocks first.');return;}
@@ -184,22 +214,18 @@
     lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();setStatus('Analysis refreshed.');
   }
 
-  function openMulti(){ $('multiModal').classList.add('show'); $('multiModal').setAttribute('aria-hidden','false'); $('multiInput').focus(); }
-  function closeMulti(){ $('multiModal').classList.remove('show'); $('multiModal').setAttribute('aria-hidden','true'); }
-  async function addMultiple(){
-    const tokens=$('multiInput').value.split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean).slice(0,MAX_STOCKS-stocks.length); if(!tokens.length)return closeMulti();
-    closeMulti(); setStatus('Adding stocks…');
-    for(const token of tokens){ await addStock({symbol:token,name:token}); }
-    $('multiInput').value='';
-  }
 
   $('stockSearch').addEventListener('input',()=>{selectedSuggestion=null;clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchStocks($('stockSearch').value),220);});
   $('stockSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(item.symbol){addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();}}});
   document.addEventListener('click',e=>{if(!e.target.closest('.analysis-search-box'))hideSuggestions();});
   $('addBtn').addEventListener('click',()=>{const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(!item.symbol){setStatus('Search a stock first.',true);return;}addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();});
-  $('addMultipleBtn').addEventListener('click',openMulti); $('multiAddConfirm').addEventListener('click',addMultiple);
-  document.querySelectorAll('[data-close-modal]').forEach(x=>x.addEventListener('click',closeMulti));
-  $('clearAllBtn').addEventListener('click',()=>{if(!stocks.length)return;if(confirm('Remove all stocks from this analysis page?')){stocks.length=0;render();setStatus('All stocks removed.');}});
-  $('exportBtn').addEventListener('click',exportCsv); $('refreshBtn').addEventListener('click',refreshAll);
-  render();
+  $('clearAllBtn').addEventListener('click',async()=>{
+    if(!stocks.length)return;
+    if(!confirm('Remove all stocks from Buy Zone?'))return;
+    const backup=stocks.slice(); stocks.length=0; render(); setStatus('Removing all stocks…');
+    try{await saveStocks();setStatus('All stocks removed from database.');}
+    catch(e){stocks.push(...backup);render();setStatus(e.message||'Unable to clear database',true);}
+  });
+  $('refreshBtn').addEventListener('click',refreshAll);
+  loadSavedStocks();
 })();

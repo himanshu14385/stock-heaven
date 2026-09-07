@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stock Analysis • Stock Heaven</title>
+  <title>Buy Zone • Stock Heaven</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="stock-analysis.css?v=20260907-1800">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -28,7 +28,7 @@
       <a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
       <a href="movement-catch.html" class="nav-item"><i class="fa-solid fa-bolt"></i><span>Catch</span></a>
       <a href="crypto.html" class="nav-item"><i class="fa-brands fa-bitcoin"></i><span>Crypto</span></a>
-      <a href="stock-analysis.html" class="nav-item active"><i class="fa-solid fa-magnifying-glass-chart"></i><span>Analysis</span></a>
+      <a href="stock-analysis.html" class="nav-item active"><i class="fa-solid fa-bullseye"></i><span>Buy Zone</span></a>
     </div>
   </nav>
 
@@ -37,38 +37,38 @@
       <div class="analysis-title">
         <div class="analysis-title-icon"><i class="fa-solid fa-chart-column"></i></div>
         <div>
-          <h2>Stock Analysis</h2>
-          <p>Search and add stocks to get Buy/Sell zones and technical analysis.</p>
+          <h2>Buy Zone</h2>
+          <p>Search and add stocks to get valuation zones and technical analysis.</p>
         </div>
       </div>
       <div class="head-actions">
         <button id="clearAllBtn" class="btn btn-danger-soft"><i class="fa-solid fa-trash"></i> Clear All</button>
-        <button id="exportBtn" class="btn btn-blue-soft"><i class="fa-solid fa-download"></i> Export</button>
       </div>
     </section>
 
-    <section class="analysis-toolbar">
-      <div class="search-add-wrap">
-        <div class="analysis-search-box">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input id="stockSearch" autocomplete="off" placeholder="Search and add stocks (e.g. Tata Motors, Reliance, HDFC Bank...)">
-          <div id="stockSuggestions" class="analysis-suggestions"></div>
+    <section class="analysis-control-container">
+      <section class="analysis-toolbar">
+        <div class="search-add-wrap">
+          <div class="analysis-search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="stockSearch" autocomplete="off" placeholder="Search and add stocks (e.g. Tata Motors, Reliance, HDFC Bank...)">
+            <div id="stockSuggestions" class="analysis-suggestions"></div>
+          </div>
+          <button id="addBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add</button>
         </div>
-        <button id="addBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add</button>
-        <button id="addMultipleBtn" class="btn btn-outline"><i class="fa-solid fa-plus"></i> Add Multiple</button>
-      </div>
-      <div id="statusText" class="analysis-status"></div>
+        <div id="statusText" class="analysis-status"></div>
+      </section>
+
+      <section class="analysis-summary">
+        <div class="summary-box"><strong id="countAll">0</strong><span>Stocks</span></div>
+        <div class="summary-box buy"><strong id="countBuy">0</strong><span>Buy Zone</span></div>
+        <div class="summary-box hold"><strong id="countHold">0</strong><span>Hold Zone</span></div>
+        <div class="summary-box sell"><strong id="countSell">0</strong><span>Sell Zone</span></div>
+        <div class="summary-box strong"><strong id="countStrong">0</strong><span>Strong Buy</span></div>
+      </section>
     </section>
 
-    <section class="analysis-summary">
-      <div class="summary-box"><strong id="countAll">0</strong><span>Stocks</span></div>
-      <div class="summary-box buy"><strong id="countBuy">0</strong><span>Buy Zone</span></div>
-      <div class="summary-box hold"><strong id="countHold">0</strong><span>Hold Zone</span></div>
-      <div class="summary-box sell"><strong id="countSell">0</strong><span>Sell Zone</span></div>
-      <div class="summary-box strong"><strong id="countStrong">0</strong><span>Strong Buy</span></div>
-    </section>
-
-    <section class="analysis-table-card">
+    <section class="analysis-table-card container-fluid">
       <div class="analysis-table-scroll">
         <table class="analysis-table">
           <thead>
@@ -77,7 +77,6 @@
               <th class="col-stock">Stock</th>
               <th class="col-price">Price<div>Change</div></th>
               <th class="col-zone">Buy / Sell Zone<div>Fair Value</div></th>
-              <th class="col-zonebar">Valuation Position</th>
               <th class="col-view">Current View</th>
               <th class="col-tech">Technical Analysis<div>RSI · MACD · Trend · Moving Averages · BB · VWAP · Volume</div></th>
               <th class="col-action">Action</th>
@@ -88,7 +87,7 @@
         <div id="emptyState" class="analysis-empty">
           <div class="empty-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
           <h3>No stocks added yet</h3>
-          <p>Search a stock above and click <b>Add</b>. You can analyse up to 15 stocks on this page.</p>
+          <p>Search a stock above and click <b>Add</b>. Your Buy Zone list is saved in the database.</p>
         </div>
       </div>
     </section>
@@ -100,15 +99,7 @@
   </main>
 </div>
 
-<div id="multiModal" class="analysis-modal" aria-hidden="true">
-  <div class="modal-backdrop" data-close-modal></div>
-  <div class="modal-box">
-    <div class="modal-head"><div><h3>Add Multiple Stocks</h3><p>Enter symbols separated by comma or space.</p></div><button class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button></div>
-    <textarea id="multiInput" rows="5" placeholder="TATAMOTORS, RELIANCE, HDFCBANK, INFY"></textarea>
-    <div class="modal-note">Maximum 15 stocks total.</div>
-    <div class="modal-actions"><button class="btn btn-outline" data-close-modal>Cancel</button><button id="multiAddConfirm" class="btn btn-primary">Add Stocks</button></div>
-  </div>
-</div>
+
 
 <script src="stock-analysis.js?v=20260907-1800"></script>
 </body>
