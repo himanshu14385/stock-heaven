@@ -172,6 +172,54 @@ function marketQuote(q) {
 }
 
 
+async function fetchYahooLiveQuote(symbol) {
+  const clean = String(symbol || '').trim().toUpperCase().replace(/\.NS$/i, '');
+  if (!clean) return null;
+  const yahooSymbol = `${clean}.NS`;
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m&includePrePost=false`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' },
+      cache: 'no-store'
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const result = body?.chart?.result?.[0];
+    if (!result) return null;
+
+    const meta = result.meta || {};
+    const quote = result.indicators?.quote?.[0] || {};
+    const closes = (quote.close || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const opens = (quote.open || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const highs = (quote.high || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const lows = (quote.low || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const volumes = (quote.volume || []).filter(v => Number.isFinite(Number(v))).map(Number);
+
+    const price = Number(meta.regularMarketPrice);
+    const previousClose = Number(meta.chartPreviousClose ?? meta.previousClose);
+    const lastPrice = Number.isFinite(price) && price > 0 ? price : (closes.length ? closes[closes.length - 1] : null);
+    if (!Number.isFinite(lastPrice)) return null;
+
+    const prev = Number.isFinite(previousClose) && previousClose > 0 ? previousClose : null;
+    const change = prev != null ? lastPrice - prev : 0;
+    const percentChange = prev ? (change / prev) * 100 : 0;
+
+    return {
+      price: lastPrice,
+      previous_close: prev,
+      change,
+      percent_change: percentChange,
+      day_open: Number.isFinite(Number(meta.regularMarketOpen)) ? Number(meta.regularMarketOpen) : (opens[0] ?? null),
+      day_high: Number.isFinite(Number(meta.regularMarketDayHigh)) ? Number(meta.regularMarketDayHigh) : (highs.length ? Math.max(...highs) : lastPrice),
+      day_low: Number.isFinite(Number(meta.regularMarketDayLow)) ? Number(meta.regularMarketDayLow) : (lows.length ? Math.min(...lows) : lastPrice),
+      volume: Number.isFinite(Number(meta.regularMarketVolume)) ? Number(meta.regularMarketVolume) : (volumes.length ? volumes[volumes.length - 1] : null),
+      as_of: Number(meta.regularMarketTime) || null,
+      price_source: 'Yahoo Finance live market quote',
+      ohlc_source: 'Yahoo Finance live market quote'
+    };
+  } catch (_) { return null; }
+}
+
 async function fetchEquityPanditQuote(symbol) {
   const clean = String(symbol || "").trim().toLowerCase().replace(/\.ns$/i, "");
   if (!clean) return null;
@@ -741,6 +789,14 @@ export default {
       const symbol = rawSymbol.endsWith(".NS") ? rawSymbol.slice(0, -3) : rawSymbol;
       const yahooSymbol = `${symbol}.NS`;
 
+      // Live quote mode is intentionally lightweight so watchlists can refresh
+      // without downloading the full 2-year technical history each time.
+      const liveQuote = await fetchYahooLiveQuote(symbol);
+      if (url.searchParams.get("live") === "1") {
+        if (liveQuote) return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", currency: "INR", ...liveQuote });
+        return json({ error: "Live quote unavailable" }, 502);
+      }
+
       // Always fetch Yahoo history separately. The displayed quote/OHLC can come
       // from the NSE historical source, but the dashboard needs the full daily
       // history for 20/50/200 DMA and other technical calculations.
@@ -773,8 +829,23 @@ export default {
         }
       } catch (_) {}
 
-      // NSE historical data remains the primary source for the displayed latest
-      // price/OHLC because Yahoo can occasionally expose a stale ETF candle.
+      // Use the latest market quote when Yahoo provides it. This fixes the
+      // previous-day/stale-candle issue while keeping the full daily history
+      // separate for technical calculations.
+      if (liveQuote) {
+        return json({
+          symbol,
+          yahoo_symbol: yahooSymbol,
+          exchange: "NSE",
+          currency: "INR",
+          ...liveQuote,
+          year_high: yahooData?.meta?.fiftyTwoWeekHigh ?? null,
+          year_low: yahooData?.meta?.fiftyTwoWeekLow ?? null,
+          history: yahooData?.history || []
+        });
+      }
+
+      // Fallback to NSE historical data if Yahoo's live quote is unavailable.
       const ep = await fetchEquityPanditQuote(symbol);
       if (ep) {
         return json({
