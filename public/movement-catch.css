@@ -36,7 +36,7 @@
     background:linear-gradient(135deg,#3475e8,#6957d8);
     box-shadow:0 5px 14px rgba(52,117,232,.18);
 }
-.swing-conditions[hidden],.bb-conditions[hidden]{display:none}
+.swing-conditions[hidden]{display:none}
 
 @media(max-width:700px){
     .catch-tabs{width:100%;}
@@ -45,4 +45,30 @@
 
 
 /* Crypto live price tab */
-.bb-conditions .condition-title{letter-spacing:-.1px}
+/* Popular Stocks sidebar — same Stock Heaven design used across the dashboard. */
+.movement-side-stocks{
+    position:fixed;
+    top:80px;
+    left:20px;
+    width:345px;
+    max-height:calc(100vh - 96px);
+    overflow:hidden;
+    background:#fff;
+    border:1px solid #e8ebf1;
+    border-radius:14px;
+    padding:12px;
+    box-shadow:0 8px 25px rgba(30,45,80,.06);
+    z-index:50;
+    box-sizing:border-box;
+}
+.movement-side-stocks .side-stocks-title{display:flex;align-items:center;gap:7px;padding:5px 6px 11px;border-bottom:1px solid #eef1f5;color:#20283a;font-size:13px;font-weight:800}
+.movement-side-stocks .side-stocks-title i{color:#416ee8;font-size:12px}
+.movement-side-stocks .side-stock-list{display:flex;flex-direction:column;gap:2px;margin-top:7px;max-height:calc(100vh - 155px);overflow-y:auto;padding-right:2px}
+.movement-side-stocks .side-stock-list::-webkit-scrollbar{width:5px}
+.movement-side-stocks .side-stock-list::-webkit-scrollbar-thumb{background:#dfe5ef;border-radius:99px}
+.movement-side-stocks .side-stock{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 7px;border:none;background:transparent;border-radius:9px;cursor:pointer;text-align:left;transition:background .18s ease,transform .18s ease}
+.movement-side-stocks .side-stock:hover{background:#f3f6ff;transform:translateX(2px)}
+.movement-side-stocks .side-stock-name{font-size:13px;font-weight:700;color:#30394b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.movement-side-stocks .side-stock-symbol{font-size:10px;font-weight:700;color:#8b94a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.movement-side-stocks .side-stock:hover .side-stock-name,.movement-side-stocks .side-stock:hover .side-stock-symbol{color:#416ee8}
+@media(max-width:1699px){.movement-side-stocks{display:none}}
