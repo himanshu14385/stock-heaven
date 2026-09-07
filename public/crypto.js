@@ -32,6 +32,8 @@ function render(){
         <div><span>24H HIGH</span><b>${priceFmt(c.high)}</b></div>
         <div><span>24H LOW</span><b>${priceFmt(c.low)}</b></div>
         <div><span>24H VOLUME</span><b>${shortNum(c.volume)}</b></div>
+        <div><span>1Y HIGH</span><b>${priceFmt(c.year_high)}</b></div>
+        <div><span>1Y LOW</span><b>${priceFmt(c.year_low)}</b></div>
       </div>
       <div class="crypto-card-foot"><span class="live-dot"><i class="fa-solid fa-circle"></i> Live CoinDCX</span><span>#${i+1}</span></div>
    </article>`
@@ -99,7 +101,7 @@ async function addCoin(market){
  setStatus('<i class="fa-solid fa-spinner fa-spin"></i> Fetching live CoinDCX price…','loading');
  try{
    const d=await getTicker(market);
-   const coin={market:d.market,symbol:d.symbol,name:d.name,last_price:d.last_price,change_24_hour:d.change_24_hour,high:d.high,low:d.low,volume:d.volume,timestamp:d.timestamp};
+   const coin={market:d.market,symbol:d.symbol,name:d.name,last_price:d.last_price,change_24_hour:d.change_24_hour,high:d.high,low:d.low,volume:d.volume,year_high:d.year_high,year_low:d.year_low,timestamp:d.timestamp};
    const next=[...cryptoCoins,coin];
    render();
    const saved=await saveCoins(next);
