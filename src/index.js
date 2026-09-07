@@ -33,6 +33,21 @@ function num(v) {
   const n = Number(s.replace(/[^0-9.+-]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
+
+function calculateATR(history, period = 14) {
+  const rows = Array.isArray(history) ? history : [];
+  const tr = [];
+  for (let i = 1; i < rows.length; i++) {
+    const high = Number(rows[i]?.high);
+    const low = Number(rows[i]?.low);
+    const prevClose = Number(rows[i - 1]?.close);
+    if (![high, low, prevClose].every(Number.isFinite)) continue;
+    tr.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+  }
+  if (tr.length < period) return null;
+  return tr.slice(-period).reduce((sum, value) => sum + value, 0) / period;
+}
+
 function slugifyName(name) {
   return String(name || "")
     .toLowerCase()
@@ -171,32 +186,6 @@ function marketQuote(q) {
   };
 }
 
-
-async function fetchYahooRealtimeQuote(symbol){
-  const clean=String(symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
-  if(!clean)return null;
-  try{
-    const yahooSymbol=`${clean}.NS`;
-    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m&includePrePost=false&events=div%2Csplits`;
-    const r=await fetch(url,{headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json,text/plain,*/*"},cache:'no-store'});
-    if(!r.ok)return null;
-    const body=await r.json();
-    const result=body?.chart?.result?.[0];
-    const meta=result?.meta||{};
-    const q=result?.indicators?.quote?.[0]||{};
-    const ts=result?.timestamp||[];
-    let last=null,lastIndex=-1;
-    for(let i=(q.close?.length||0)-1;i>=0;i--){const v=Number(q.close[i]);if(Number.isFinite(v)){last=v;lastIndex=i;break;}}
-    const regular=Number(meta.regularMarketPrice);
-    const price=Number.isFinite(regular)?regular:last;
-    if(!Number.isFinite(price))return null;
-    const prev=Number(meta.previousClose ?? meta.chartPreviousClose);
-    const previousClose=Number.isFinite(prev)&&prev>0?prev:(Number.isFinite(Number(q.close?.[lastIndex-1]))?Number(q.close[lastIndex-1]):null);
-    const change=previousClose!=null?price-previousClose:null;
-    const percentChange=previousClose?change/previousClose*100:null;
-    return {price,previous_close:previousClose,change,percent_change:percentChange,day_open:Number.isFinite(Number(meta.regularMarketOpen))?Number(meta.regularMarketOpen):(Number.isFinite(Number(q.open?.[lastIndex]))?Number(q.open[lastIndex]):null),day_high:Number.isFinite(Number(meta.regularMarketDayHigh))?Number(meta.regularMarketDayHigh):(Number.isFinite(Number(q.high?.[lastIndex]))?Number(q.high[lastIndex]):null),day_low:Number.isFinite(Number(meta.regularMarketDayLow))?Number(meta.regularMarketDayLow):(Number.isFinite(Number(q.low?.[lastIndex]))?Number(q.low[lastIndex]):null),volume:Number.isFinite(Number(meta.regularMarketVolume))?Number(meta.regularMarketVolume):(Number.isFinite(Number(q.volume?.[lastIndex]))?Number(q.volume[lastIndex]):null),market_time:Number.isFinite(Number(meta.regularMarketTime))?Number(meta.regularMarketTime):(Number.isFinite(Number(ts[lastIndex]))?Number(ts[lastIndex]):null),price_source:'Yahoo Finance intraday quote',realtime:true};
-  }catch(_){return null;}
-}
 
 async function fetchEquityPanditQuote(symbol) {
   const clean = String(symbol || "").trim().toLowerCase().replace(/\.ns$/i, "");
@@ -799,26 +788,19 @@ export default {
         }
       } catch (_) {}
 
-      // Use Yahoo's 1-minute market quote for the displayed live price when
-      // available. Keep the daily NSE historical source for technical history/OHLC
-      // fallback so the indicators continue to use stable daily candles.
-      const realtime = await fetchYahooRealtimeQuote(symbol);
+      // NSE historical data remains the primary source for the displayed latest
+      // price/OHLC because Yahoo can occasionally expose a stale ETF candle.
       const ep = await fetchEquityPanditQuote(symbol);
-      if (ep || realtime) {
-        const quote = realtime || ep;
+      if (ep) {
         return json({
           symbol,
           yahoo_symbol: yahooSymbol,
           exchange: "NSE",
           currency: "INR",
-          ...(ep || {}),
-          ...quote,
+          ...ep,
           year_high: yahooData?.meta?.fiftyTwoWeekHigh ?? null,
           year_low: yahooData?.meta?.fiftyTwoWeekLow ?? null,
-          history: yahooData?.history || [],
-          price_source: realtime ? "Yahoo Finance intraday quote" : ep?.price_source,
-          ohlc_source: ep ? ep.ohlc_source : "Yahoo Finance intraday quote",
-          realtime: !!realtime
+          history: yahooData?.history || []
         });
       }
 
