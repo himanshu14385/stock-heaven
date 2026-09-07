@@ -61,6 +61,7 @@
     <div class="catch-tabs" role="tablist" aria-label="Catch strategies">
         <button class="catch-tab active" data-tab="movement" role="tab" aria-selected="true"><i class="fa-solid fa-bolt"></i><span>Movement Catch</span></button>
         <button class="catch-tab" data-tab="swing" role="tab" aria-selected="false"><i class="fa-solid fa-chart-line"></i><span>Swing</span></button>
+        <button class="catch-tab" data-tab="bb" role="tab" aria-selected="false"><i class="fa-solid fa-chart-area"></i><span>BB Indi</span></button>
     </div>
 
     <section class="movement-search card">
@@ -110,6 +111,45 @@
         <section class="conditions-panel card swing-conditions" id="swingConditions" hidden>
             <div class="panel-heading condition-heading"><div><div class="panel-label">SWING CHECK</div><h3>Swing Setup Conditions</h3></div><span id="swingDataDate" class="data-date">Daily data</span></div>
             <div id="swingConditionList" class="condition-list"></div>
+        </section>
+
+        <section class="bb-panel card" id="bbPanel" hidden>
+            <div class="panel-heading condition-heading">
+                <div>
+                    <div class="panel-label">BOLLINGER BANDS</div>
+                    <h3>BB Indicator</h3>
+                </div>
+                <span id="bbDataDate" class="data-date">Daily data</span>
+            </div>
+
+            <div class="bb-signal-row">
+                <div class="bb-signal-box" id="bbSignalBox">
+                    <span class="bb-mini-label">BB SIGNAL</span>
+                    <strong id="bbSignal">WAIT</strong>
+                    <small id="bbSignalText">Analyze a stock to calculate Bollinger Band position.</small>
+                </div>
+                <div class="bb-score-box">
+                    <span>Position</span>
+                    <strong id="bbPosition">--</strong>
+                </div>
+            </div>
+
+            <div class="bb-level-grid">
+                <div class="bb-level"><span>Upper Band</span><strong id="bbUpper">--</strong></div>
+                <div class="bb-level"><span>Middle Band · SMA 20</span><strong id="bbMiddle">--</strong></div>
+                <div class="bb-level"><span>Lower Band</span><strong id="bbLower">--</strong></div>
+                <div class="bb-level"><span>%B</span><strong id="bbPercentB">--</strong></div>
+                <div class="bb-level"><span>Bandwidth</span><strong id="bbBandwidth">--</strong></div>
+                <div class="bb-level"><span>Distance to Lower</span><strong id="bbLowerDist">--</strong></div>
+            </div>
+
+            <div class="bb-meter-wrap">
+                <div class="bb-meter-head"><span>Price Position Inside Bands</span><strong id="bbMeterValue">--</strong></div>
+                <div class="bb-meter"><span id="bbMeterFill"></span></div>
+                <div class="bb-meter-labels"><span>Lower</span><span>Middle</span><span>Upper</span></div>
+            </div>
+
+            <div class="bb-condition-list" id="bbConditionList"></div>
         </section>
 
 

@@ -69,14 +69,128 @@ function renderSwing(d){
         condition('Room to resistance',res!=null?`${fmt(price)} vs ${fmt(res)}`:'Resistance unavailable',room)
     ].join('');
 }
+
+function bollingerBands(a, n=20, mult=2){
+    if(!Array.isArray(a) || a.length<n) return null;
+    const slice=a.slice(-n).map(Number).filter(Number.isFinite);
+    if(slice.length<n) return null;
+    const middle=slice.reduce((x,y)=>x+y,0)/n;
+    const variance=slice.reduce((x,y)=>x+Math.pow(y-middle,2),0)/n;
+    const sd=Math.sqrt(variance);
+    const upper=middle+mult*sd;
+    const lower=middle-mult*sd;
+    return {middle,upper,lower,sd};
+}
+function renderBB(d){
+    const price=Number(d.price);
+    const closes=(d.history||[]).map(x=>Number(x.close)).filter(Number.isFinite);
+    const bb=bollingerBands(closes,20,2);
+    if(!bb){
+        set('bbSignal','WAIT');
+        set('bbSignalText','At least 20 valid closing prices are required.');
+        set('bbPosition','--');
+        set('bbUpper','--');set('bbMiddle','--');set('bbLower','--');
+        set('bbPercentB','--');set('bbBandwidth','--');set('bbLowerDist','--');set('bbMeterValue','--');
+        if($('bbMeterFill'))$('bbMeterFill').style.width='0%';
+        if($('bbConditionList'))$('bbConditionList').innerHTML='';
+        return;
+    }
+
+    const range=bb.upper-bb.lower;
+    const percentB=range>0?(price-bb.lower)/range:null;
+    const bandwidth=bb.middle!==0?(range/bb.middle)*100:null;
+    const lowerDist=bb.lower!==0?((price-bb.lower)/bb.lower)*100:null;
+    const middleDist=bb.middle!==0?((price-bb.middle)/bb.middle)*100:null;
+
+    let signal='WAIT', signalClass='wait', text='Price is inside the Bollinger Band range.';
+    if(price<=bb.lower*1.01){
+        signal='LOWER BAND'; signalClass='buy';
+        text='Price is near the lower Bollinger Band. Watch for a reversal confirmation.';
+    }else if(price>=bb.upper*0.99){
+        signal='UPPER BAND'; signalClass='avoid';
+        text='Price is near the upper Bollinger Band. Watch for rejection or continuation strength.';
+    }else if(price>bb.middle){
+        signal='BULLISH ZONE'; signalClass='buy';
+        text='Price is above the 20-period middle band, showing positive BB positioning.';
+    }else{
+        signal='BEARISH ZONE'; signalClass='avoid';
+        text='Price is below the 20-period middle band, showing weaker BB positioning.';
+    }
+
+    if(bandwidth!=null && bandwidth<5){
+        signal='BB SQUEEZE'; signalClass='wait';
+        text='Bollinger Band width is compressed. A volatility expansion may be approaching.';
+    }
+
+    const position = percentB==null?'--':
+        percentB<=0?'Below Lower':
+        percentB<0.25?'Lower Zone':
+        percentB<0.5?'Lower-Mid':
+        percentB<0.75?'Upper-Mid':
+        percentB<1?'Upper Zone':'Above Upper';
+
+    set('bbSignal',signal);
+    set('bbSignalText',text);
+    set('bbPosition',position);
+    set('bbUpper',fmt(bb.upper));
+    set('bbMiddle',fmt(bb.middle));
+    set('bbLower',fmt(bb.lower));
+    set('bbPercentB',percentB==null?'--':`${(percentB*100).toFixed(1)}%`);
+    set('bbBandwidth',bandwidth==null?'--':`${bandwidth.toFixed(2)}%`);
+    set('bbLowerDist',lowerDist==null?'--':fmtPct(lowerDist));
+    set('bbMeterValue',percentB==null?'--':`${Math.max(0,Math.min(100,percentB*100)).toFixed(1)}%`);
+    set('bbDataDate',d.as_of?`Data: ${d.as_of}`:'Daily data');
+
+    if($('bbMeterFill')){
+        $('bbMeterFill').style.width=`${Math.max(0,Math.min(100,(percentB??0)*100))}%`;
+    }
+    if($('bbSignalBox')){
+        $('bbSignalBox').className=`bb-signal-box ${signalClass}`;
+    }
+
+    const nearLower=price<=bb.lower*1.02;
+    const aboveMiddle=price>bb.middle;
+    const nearUpper=price>=bb.upper*0.98;
+    const squeeze=bandwidth!=null&&bandwidth<5;
+    const outsideUpper=price>bb.upper;
+    const outsideLower=price<bb.lower;
+
+    $('bbConditionList').innerHTML=[
+        condition('Price vs Lower Band',`${fmt(price)} vs ${fmt(bb.lower)}`,nearLower),
+        condition('Price vs Middle Band',`${fmt(price)} vs ${fmt(bb.middle)}`,aboveMiddle),
+        condition('Price vs Upper Band',`${fmt(price)} vs ${fmt(bb.upper)}`,nearUpper),
+        condition('BB Squeeze',bandwidth==null?'Bandwidth unavailable':`${bandwidth.toFixed(2)}% bandwidth`,squeeze),
+        condition('Inside Bollinger Range',outsideUpper?'Price is above the upper band.':outsideLower?'Price is below the lower band.':'Price is inside the bands.',!(outsideUpper||outsideLower))
+    ].join('');
+
+    // Keep useful BB values with the already-fetched stock data.
+    d.bb=bb; d.bbPercentB=percentB; d.bbBandwidth=bandwidth;
+}
+
 function renderTab(){
     if(!currentData)return;
+    const movement=currentTab==='movement';
     const swing=currentTab==='swing';
-    $('movementConditions').hidden=swing;
+    const bb=currentTab==='bb';
+
+    $('movementConditions').hidden=!movement;
     $('swingConditions').hidden=!swing;
-    renderSwingOrMovement();
+    $('bbPanel').hidden=!bb;
+
+    // Trade plan remains shared and useful for Movement/Swing; BB is an indicator view.
+    const tradePanel=document.querySelector('.trade-panel');
+    if(tradePanel) tradePanel.style.display=bb?'none':'';
+    const signalPanel=document.getElementById('signalCard');
+    if(signalPanel) signalPanel.style.display=bb?'none':'';
+
+    if(movement) renderMovement(currentData);
+    else if(swing) renderSwing(currentData);
+    else renderBB(currentData);
 }
-function renderSwingOrMovement(){if(!currentData)return;currentTab==='swing'?renderSwing(currentData):renderMovement(currentData)}
+function renderSwingOrMovement(){
+    if(!currentData)return;
+    currentTab==='swing'?renderSwing(currentData):renderMovement(currentData);
+}
 async function analyze(symbol){const id=++req;symbol=(symbol||'').trim().toUpperCase();if(!symbol)return;$('status').textContent='Loading market data…';$('result').hidden=true;try{const r=await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);const d=await r.json();if(id!==req)return;if(!r.ok||d.error)throw Error(d.error||'Stock not found');let hist=d.history||[];let c=hist.map(x=>Number(x.close)).filter(Number.isFinite),h=hist.map(x=>Number(x.high)),l=hist.map(x=>Number(x.low)),v=hist.map(x=>Number(x.volume||0));if(c.length<50)throw Error(`Only ${c.length} daily records available. At least 50 are needed.`);let price=Number(d.price),e20=ema(c,20),e50=ema(c,50),R=rsi(c),av=sma(v,20),vw=vwap20(h,l,c,v),atr=Number.isFinite(Number(d.atr))?Number(d.atr):atr14(h,l,c,14);let prevHigh=h.slice(0,-1).slice(-20).filter(Number.isFinite),prevLow=l.slice(0,-1).slice(-20).filter(Number.isFinite),res=prevHigh.length?Math.max(...prevHigh):null,sup=prevLow.length?Math.min(...prevLow):null;let trend=price>e20&&e20>e50,above20=price>e20,volBreak=Number(d.volume)>av*1.5,rsiz=R>=55&&R<=70,aboveVwap=vw!=null&&price>vw,breakout=res!=null&&price>res;let retest=false;if(res!=null){for(let i=Math.max(0,l.length-5);i<l.length-1;i++){if(l[i]<=res*1.015&&c[i]>=res*0.995&&c[i]<=res*1.03){retest=true;break}}}let checks=[trend,above20,volBreak,rsiz,aboveVwap,breakout,retest],score=checks.filter(Boolean).length;let entry=breakout?(retest?Math.max(price,res):res):null,sl=(retest&&sup?Math.min(sup,res*0.985):res?res*0.985:null),risk=entry&&sl?entry-sl:null,target=entry&&risk?entry+risk*2:null,rr=entry&&risk&&target?(target-entry)/risk:null;currentData={...d,price,e20,e50,R,av,vw,atr,res,sup,volume:Number(d.volume),trend,above20,volBreak,rsiz,aboveVwap,breakout,retest,checks,score,entry,sl,target,rr};set('symbol',symbol.replace(/\.NS$/,''));set('company',d.name||symbol);set('price',fmt(price));set('change',`${fmt(d.change)} (${fmtPct(d.percent_change)})`);$('result').hidden=false;$('status').textContent='Analysis complete.';renderTab()}catch(e){if(id===req){currentData=null;$('status').textContent=e.message||'Unable to analyze stock.'}}}
 
 document.querySelectorAll('.catch-tab').forEach(tab=>tab.addEventListener('click',()=>{currentTab=tab.dataset.tab;document.querySelectorAll('.catch-tab').forEach(x=>{const active=x===tab;x.classList.toggle('active',active);x.setAttribute('aria-selected',active?'true':'false')});renderTab()}));
