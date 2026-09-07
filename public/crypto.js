@@ -100,7 +100,7 @@ async function addCoin(market){
    const saved=await saveCoins(next);
    if(!saved.some(x=>x.market===coin.market))throw Error('Coin could not be confirmed in the D1 database.');
    if(input)input.value='';
-   setStatus('<i class="fa-solid fa-circle-check"></i> Coin added. Saved securely in D1 and live price is updating automatically.','success');
+   setStatus('<i class="fa-solid fa-circle-check"></i> Coin added. Saved securely in D1. Click Refresh Prices to update the price.','success');
  }catch(e){
    await loadCoins();
    setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Unable to add coin.')}`,'error');
@@ -119,13 +119,13 @@ async function refreshPrices(){
    const markets=cryptoCoins.map(c=>c.market).join(',');
    const r=await fetch(`/api/crypto/ticker?markets=${encodeURIComponent(markets)}`,{cache:'no-store'});
    const d=await r.json().catch(()=>({}));
-   if(!r.ok||d.error)return;
+   if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
    const list=Array.isArray(d.results)?d.results:(d.results?[d.results]:[]);
    const map=new Map(list.map(x=>[x.market,x]));
    cryptoCoins=cryptoCoins.map(c=>map.get(c.market)?{...c,...map.get(c.market)}:c);
    render();
    const stamp=$('cryptoLastUpdate');if(stamp)stamp.textContent='Updated just now';
- }catch(_){/* keep last known price */}
+ }catch(e){throw e;}
 }
 
 
