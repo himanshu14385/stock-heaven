@@ -201,7 +201,7 @@
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
       <td><div class="price-main">${money(price)}</div><div class="price-change ${ch!=null&&ch>=0?'up':'down'}">${ch==null?'—':(ch>=0?'+':'')+fixed(ch)} (${pct==null?'—':(pct>=0?'+':'')+fixed(pct,2)+'%'})</div></td>
-      <td><span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span><div class="zone-range">Buy Price: <b>${money(a.buyPrice)}</b></div></td>
+      <td>${a.zoneClass==='hold'?'':`<span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span>`}<div class="zone-range">Buy Price: <b>${money(a.buyPrice)}</b></div></td>
       <td><span class="current-view-badge ${currentClass}">${currentView}</span></td>
       <td><div class="tech-grid">
         ${techCell('RSI (14)',fixed(t.rsi,1),rsiStatus,rsiType)}
