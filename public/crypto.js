@@ -82,8 +82,9 @@ async function getTicker(market){
  const r=await fetch(`/api/crypto/ticker?market=${encodeURIComponent(market)}`,{cache:'no-store'});
  const d=await r.json().catch(()=>({}));
  if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
- if(!d.market)throw Error('CoinDCX did not return a valid market price. Please try again.');
- return d;
+ const item=d.results && !Array.isArray(d.results) ? d.results : d;
+ if(!item || !item.market)throw Error('CoinDCX did not return a valid market price. Please try again.');
+ return item;
 }
 async function addCoin(market){
  if(!market)return;
