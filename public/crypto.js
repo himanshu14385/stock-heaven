@@ -82,9 +82,8 @@ async function getTicker(market){
  const r=await fetch(`/api/crypto/ticker?market=${encodeURIComponent(market)}`,{cache:'no-store'});
  const d=await r.json().catch(()=>({}));
  if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
- const item=d.results && !Array.isArray(d.results) ? d.results : d;
- if(!item || !item.market)throw Error('CoinDCX did not return a valid market price. Please try again.');
- return item;
+ if(!d.market)throw Error('CoinDCX did not return a valid market price. Please try again.');
+ return d;
 }
 async function addCoin(market){
  if(!market)return;
@@ -129,9 +128,39 @@ async function refreshPrices(){
  }catch(_){/* keep last known price */}
 }
 
+
+function setLastUpdate(text){
+ const stamp=$('cryptoLastUpdate');
+ if(stamp)stamp.textContent=text;
+}
+async function manualRefreshPrices(){
+ const btn=$('cryptoRefreshBtn');
+ if(btn){
+   btn.disabled=true;
+   btn.classList.add('is-loading');
+   btn.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Refreshing…';
+ }
+ setStatus('<i class="fa-solid fa-spinner fa-spin"></i> Fetching latest crypto prices…','loading');
+ try{
+   await refreshPrices();
+   const now=new Date();
+   setLastUpdate(`Updated ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`);
+   setStatus('<i class="fa-solid fa-circle-check"></i> Prices updated successfully.','success');
+ }catch(e){
+   setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Unable to refresh prices.')}`,'error');
+ }finally{
+   if(btn){
+     btn.disabled=false;
+     btn.classList.remove('is-loading');
+     btn.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Refresh Prices';
+   }
+ }
+}
+
 const input=$('cryptoInput');
 if(input)input.addEventListener('input',()=>{clearTimeout(searchTimer);const q=input.value.trim();if(!q){$('cryptoSuggestions').style.display='none';return}searchTimer=setTimeout(async()=>{try{showSuggestions(await searchCrypto(q))}catch(_){showSuggestions([])}},160)});
 if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const q=input.value.trim();if(q)searchCrypto(q).then(x=>x[0]&&addCoin(x[0].market)).catch(e=>setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Search failed.')}`,'error'))}});
+const refreshBtn=$('cryptoRefreshBtn');if(refreshBtn)refreshBtn.addEventListener('click',manualRefreshPrices);
 const addBtn=$('cryptoAddBtn');if(addBtn)addBtn.addEventListener('click',()=>{const q=input?.value.trim();if(q)searchCrypto(q).then(x=>x[0]?addCoin(x[0].market):setStatus('<i class="fa-solid fa-circle-info"></i> No INR coin found for that search.','info')).catch(e=>setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Search failed.')}`,'error'))});
 document.addEventListener('click',e=>{if(!e.target.closest('.crypto-search-wrap')){const s=$('cryptoSuggestions');if(s)s.style.display='none'}});
-render();loadCoins();refreshTimer=setInterval(refreshPrices,5000);
+render();loadCoins();
