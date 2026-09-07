@@ -27,24 +27,12 @@
       <a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
       <a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
       <a href="movement-catch.html" class="nav-item"><i class="fa-solid fa-bolt"></i><span>Catch</span></a>
-      <a href="crypto.html" class="nav-item"><i class="fa-brands fa-bitcoin"></i><span>Crypto</span></a>
       <a href="stock-analysis.html" class="nav-item active"><i class="fa-solid fa-bullseye"></i><span>Buy Zone</span></a>
+      <a href="crypto.html" class="nav-item"><i class="fa-brands fa-bitcoin"></i><span>Crypto</span></a>
     </div>
   </nav>
 
   <main class="analysis-main">
-    <section class="analysis-head">
-      <div class="analysis-title">
-        <div class="analysis-title-icon"><i class="fa-solid fa-chart-column"></i></div>
-        <div>
-          <h2>Buy Zone</h2>
-          <p>Search and add stocks to get valuation zones and technical analysis.</p>
-        </div>
-      </div>
-      <div class="head-actions">
-        <button id="clearAllBtn" class="btn btn-danger-soft"><i class="fa-solid fa-trash"></i> Clear All</button>
-      </div>
-    </section>
 
     <section class="analysis-control-container">
       <section class="analysis-toolbar">
@@ -67,6 +55,10 @@
         <div class="summary-box strong"><strong id="countStrong">0</strong><span>Strong Buy</span></div>
       </section>
     </section>
+
+
+  </main>
+</div>
 
     <section class="analysis-table-card container-fluid">
       <div class="analysis-table-scroll">
@@ -96,9 +88,6 @@
       <span>Valuation uses available PE/peer data; technicals are calculated from market history. For educational purposes only.</span>
       <span>Last updated: <b id="lastUpdated">—</b> <button id="refreshBtn" class="refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button></span>
     </div>
-  </main>
-</div>
-
 
 
 <script src="stock-analysis.js?v=20260907-1800"></script>
