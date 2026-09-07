@@ -6,7 +6,16 @@ function priceFmt(v){const n=Number(v);if(!Number.isFinite(n))return '--';const 
 function changeHtml(v){const n=Number(v);if(!Number.isFinite(n))return '<span class="crypto-change flat">--</span>';const up=n>=0;return `<span class="crypto-change ${up?'up':'down'}"><i class="fa-solid fa-arrow-${up?'trend-up':'trend-down'}"></i>${up?'+':''}${n.toFixed(2)}%</span>`}
 function shortNum(v){const n=Number(v);if(!Number.isFinite(n))return '--';if(n>=1e7)return `${(n/1e7).toFixed(2)}Cr`;if(n>=1e5)return `${(n/1e5).toFixed(2)}L`;if(n>=1e3)return `${(n/1e3).toFixed(2)}K`;return n.toLocaleString('en-IN',{maximumFractionDigits:2})}
 function setStatus(html,type=''){const el=$('cryptoStatus');if(!el)return;el.className=`crypto-status ${type}`;el.innerHTML=html}
-function coinInitial(symbol){return String(symbol||'C').replace(/[^A-Za-z0-9]/g,'').slice(0,1).toUpperCase()||'C'}
+const COIN_ICON_SLUGS = {"BTC":"bitcoin/F7931A","ETH":"ethereum/627EEA","SOL":"solana/9945FF","XRP":"xrp/23292F","DOGE":"dogecoin/C2A633","SHIB":"shibainu/F00500","MATIC":"polygon/8247E5","POL":"polygon/8247E5","USDT":"tether/26A17B","USDC":"usd-coin/2775CA","BNB":"binance/F3BA2F","ADA":"cardano/0033AD","DOT":"polkadot/E6007A","AVAX":"avalanche/E84142","TRX":"tron/FF060A","LINK":"chainlink/375BD2","LTC":"litecoin/345D9D","BCH":"bitcoincash/0AC18E","ATOM":"cosmos/2E3148","UNI":"uniswap/FF007A","XLM":"stellar/7D00FF","NEAR":"nearprotocol/111111","APT":"aptos/000000","SUI":"sui/4DA2FF","ARB":"arbitrum/28A0F0","OP":"optimism/FF0420","PEPE":"pepe/00A86B","FIL":"filecoin/0090FF","ALGO":"algorand/000000","ETC":"ethereumclassic/328332","ICP":"internetcomputer/29ABE2","HBAR":"hedera/222222","VET":"vechain/15BDFF","EOS":"eos/000000","AAVE":"aave/2EBAC6","MKR":"maker/1AAB9B","INJ":"injective/00F2FE","TIA":"celestia/7B2BFF","SAND":"thesandbox/00ADEF","MANA":"decentraland/FF2D55","AXS":"axieinfinity/0055D5"};
+
+function coinInitial(symbol){
+ return String(symbol||'C').replace(/[^A-Za-z0-9]/g,'').slice(0,1).toUpperCase()||'C'
+}
+function coinIconUrl(symbol){
+ const key=String(symbol||'').toUpperCase();
+ const slug=COIN_ICON_SLUGS[key]||key.toLowerCase();
+ return `https://cdn.simpleicons.org/${encodeURIComponent(slug)}`;
+}
 
 function render(){
  const box=$('cryptoList');if(!box)return;
@@ -20,7 +29,10 @@ function render(){
    const name=String(c.name||symbol);
    return `<article class="crypto-card">
       <div class="crypto-card-top">
-        <div class="coin-avatar">${esc(coinInitial(symbol))}</div>
+        <div class="coin-avatar">
+          <img src="${coinIconUrl(symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+          <span>${esc(coinInitial(symbol))}</span>
+        </div>
         <div class="coin-title"><strong>${esc(name)}</strong><span>${esc(symbol)} / INR</span></div>
         <button class="crypto-remove" title="Remove ${esc(symbol)}" data-remove="${esc(c.market)}"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -56,7 +68,10 @@ async function searchCrypto(q){
 }
 function showSuggestions(items){
  const box=$('cryptoSuggestions');if(!box)return;
- box.innerHTML=items.map(x=>`<div class="suggestion" data-market="${esc(x.market)}"><span class="suggestion-icon">${esc(coinInitial(x.symbol))}</span><span class="suggestion-copy"><b>${esc(x.name)}</b><small>${esc(x.symbol)}/INR</small></span><i class="fa-solid fa-plus"></i></div>`).join('');
+ box.innerHTML=items.map(x=>`<div class="suggestion" data-market="${esc(x.market)}"><span class="suggestion-icon">
+          <img src="${coinIconUrl(x.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-grid'">
+          <span>${esc(coinInitial(x.symbol))}</span>
+        </span><span class="suggestion-copy"><b>${esc(x.name)}</b><small>${esc(x.symbol)}/INR</small></span><i class="fa-solid fa-plus"></i></div>`).join('');
  box.style.display=items.length?'block':'none';
  box.querySelectorAll('.suggestion').forEach(x=>x.addEventListener('click',()=>addCoin(x.dataset.market)));
 }
