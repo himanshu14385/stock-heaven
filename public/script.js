@@ -1,3 +1,43 @@
+let liveQuoteTimer = null;
+let activeStockSymbol = "";
+
+async function refreshLiveStockQuote() {
+    const symbol = activeStockSymbol;
+    if (!symbol) return;
+    try {
+        const response = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}&live=1&t=${Date.now()}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok || result.error || symbol !== activeStockSymbol) return;
+
+        const price = Number(result.price);
+        if (Number.isFinite(price)) {
+            const priceEl = document.getElementById("stockPrice");
+            if (priceEl) priceEl.textContent = moneyLiveStock(price);
+        }
+
+        const change = Number(result.change);
+        const percentChange = Number(result.percent_change);
+        const changeElement = document.getElementById("stockChange");
+        if (changeElement && Number.isFinite(change) && Number.isFinite(percentChange)) {
+            changeElement.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${percentChange >= 0 ? "+" : ""}${percentChange.toFixed(2)}%)`;
+            changeElement.style.color = change >= 0 ? "#15934a" : "#e04d4d";
+        }
+
+        if (Number.isFinite(Number(result.day_high))) setTextLiveStock("highPrice", moneyLiveStock(result.day_high));
+        if (Number.isFinite(Number(result.day_low))) setTextLiveStock("lowPrice", moneyLiveStock(result.day_low));
+    } catch (_) {}
+}
+
+function moneyLiveStock(value) {
+    if (value === null || value === undefined || isNaN(Number(value))) return "--";
+    return `₹${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function setTextLiveStock(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+}
+
 async function analyzeStock() {
 
     const input = document.getElementById("stockInput");
@@ -9,6 +49,12 @@ async function analyzeStock() {
     if (!stock) {
         alert("Stock symbol enter karo");
         return;
+    }
+
+    activeStockSymbol = stock;
+    if (liveQuoteTimer) {
+        clearInterval(liveQuoteTimer);
+        liveQuoteTimer = null;
     }
 
     try {
@@ -306,6 +352,11 @@ async function analyzeStock() {
             "stockPrice",
             money(price)
         );
+
+        // Keep the dashboard quote current without re-running the heavy
+        // technical-history calculation on every refresh.
+        refreshLiveStockQuote();
+        liveQuoteTimer = setInterval(refreshLiveStockQuote, 15000);
 
 
         const change =
