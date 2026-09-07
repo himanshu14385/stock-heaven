@@ -172,61 +172,52 @@ function marketQuote(q) {
 }
 
 
-async function fetchYahooLiveQuote(yahooSymbol) {
+async function fetchYahooLiveQuote(symbol) {
+  const clean = String(symbol || '').trim().toUpperCase().replace(/\.NS$/i, '');
+  if (!clean) return null;
+  const yahooSymbol = `${clean}.NS`;
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m&events=div%2Csplits`;
-    const r = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json,text/plain,*/*"
-      },
-      cache: "no-store"
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m&includePrePost=false`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' },
+      cache: 'no-store'
     });
-    if (!r.ok) return null;
-    const body = await r.json();
+    if (!response.ok) return null;
+    const body = await response.json();
     const result = body?.chart?.result?.[0];
     if (!result) return null;
 
     const meta = result.meta || {};
-    const timestamps = result.timestamp || [];
     const quote = result.indicators?.quote?.[0] || {};
-    const rows = timestamps.map((time, i) => ({
-      time,
-      open: quote.open?.[i] ?? null,
-      high: quote.high?.[i] ?? null,
-      low: quote.low?.[i] ?? null,
-      close: quote.close?.[i] ?? null,
-      volume: quote.volume?.[i] ?? null
-    })).filter(x => x.close != null && Number.isFinite(Number(x.close)));
+    const closes = (quote.close || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const opens = (quote.open || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const highs = (quote.high || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const lows = (quote.low || []).filter(v => Number.isFinite(Number(v))).map(Number);
+    const volumes = (quote.volume || []).filter(v => Number.isFinite(Number(v))).map(Number);
 
-    const latest = rows[rows.length - 1] || null;
-    const current = Number.isFinite(Number(meta.regularMarketPrice))
-      ? Number(meta.regularMarketPrice)
-      : Number(latest?.close);
-    if (!Number.isFinite(current)) return null;
+    const price = Number(meta.regularMarketPrice);
+    const previousClose = Number(meta.chartPreviousClose ?? meta.previousClose);
+    const lastPrice = Number.isFinite(price) && price > 0 ? price : (closes.length ? closes[closes.length - 1] : null);
+    if (!Number.isFinite(lastPrice)) return null;
 
-    const previous = Number.isFinite(Number(meta.previousClose))
-      ? Number(meta.previousClose)
-      : (Number.isFinite(Number(meta.chartPreviousClose)) ? Number(meta.chartPreviousClose) : null);
-    const change = Number.isFinite(previous) ? current - previous : null;
-    const percentChange = Number.isFinite(previous) && previous !== 0 ? (change / previous) * 100 : null;
+    const prev = Number.isFinite(previousClose) && previousClose > 0 ? previousClose : null;
+    const change = prev != null ? lastPrice - prev : 0;
+    const percentChange = prev ? (change / prev) * 100 : 0;
 
     return {
-      price: current,
-      previous_close: Number.isFinite(previous) ? previous : null,
+      price: lastPrice,
+      previous_close: prev,
       change,
       percent_change: percentChange,
-      day_open: Number.isFinite(Number(meta.regularMarketPrice)) && latest?.open != null ? Number(latest.open) : (latest?.open ?? null),
-      day_high: Number.isFinite(Number(meta.regularMarketDayHigh)) ? Number(meta.regularMarketDayHigh) : (latest?.high ?? null),
-      day_low: Number.isFinite(Number(meta.regularMarketDayLow)) ? Number(meta.regularMarketDayLow) : (latest?.low ?? null),
-      volume: Number.isFinite(Number(meta.regularMarketVolume)) ? Number(meta.regularMarketVolume) : (latest?.volume ?? null),
-      as_of: meta.regularMarketTime || latest?.time || null,
-      price_source: "Yahoo Finance live market quote",
-      ohlc_source: "Yahoo Finance live market quote"
+      day_open: Number.isFinite(Number(meta.regularMarketOpen)) ? Number(meta.regularMarketOpen) : (opens[0] ?? null),
+      day_high: Number.isFinite(Number(meta.regularMarketDayHigh)) ? Number(meta.regularMarketDayHigh) : (highs.length ? Math.max(...highs) : lastPrice),
+      day_low: Number.isFinite(Number(meta.regularMarketDayLow)) ? Number(meta.regularMarketDayLow) : (lows.length ? Math.min(...lows) : lastPrice),
+      volume: Number.isFinite(Number(meta.regularMarketVolume)) ? Number(meta.regularMarketVolume) : (volumes.length ? volumes[volumes.length - 1] : null),
+      as_of: Number(meta.regularMarketTime) || null,
+      price_source: 'Yahoo Finance live market quote',
+      ohlc_source: 'Yahoo Finance live market quote'
     };
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
 async function fetchEquityPanditQuote(symbol) {
@@ -382,7 +373,7 @@ async function fetchDynamicPeers(symbol) {
 }
 
 
-const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","admin.html"]);
+const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html","admin.html"]);
 const PROTECTED_PAGE_ALIASES = {
   "/": "index.html",
   "/index.html": "index.html",
@@ -392,6 +383,7 @@ const PROTECTED_PAGE_ALIASES = {
   "/fav-stock.html": "fav-stock.html",
   "/movement-catch.html": "movement-catch.html",
   "/crypto.html": "crypto.html",
+  "/stock-analysis.html": "stock-analysis.html",
   "/admin.html": "admin.html"
 };
 const GUEST_SESSION_SECONDS = 5 * 60;
@@ -429,7 +421,7 @@ async function authInit(env){
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
   // Do NOT create a default Guest account. The single Guest credential must be
   // explicitly provisioned through the Admin panel / D1.
-  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html"]){
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html"]){
     await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
   }
 }
@@ -506,7 +498,7 @@ async function authJson(request,env,url){
   if(url.pathname==='/api/admin/restrictions'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
     if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
-    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
   }
   if(url.pathname==='/api/admin/login-log'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
@@ -517,6 +509,15 @@ async function authJson(request,env,url){
 }
 
 
+const DEFAULT_STUCK = [
+  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"208 × 647.73"},
+  {symbol:"ADANIENSOL",name:"Adani Energy Solutions Limited",stuckInfo:"33 × 2788.12"},
+  {symbol:"AWL",name:"Adani Wilmar Limited",stuckInfo:"36 × 683.35"},
+  {symbol:"ADANIGREEN",name:"Adani Green Energy",stuckInfo:"9 × 2333.43"},
+  {symbol:"FMCGIETF.NS",name:"ICICI Pru Nifty FMCG ETF",stuckInfo:"550 × 56.07"},
+  {symbol:"TMPV",name:"Tata Motors Passenger Vehicles",stuckInfo:"27 × 508.60"},
+  {symbol:"NSLNISP",name:"NMDC Steel",stuckInfo:"31 × 52.85"}
+];
 const DEFAULT_ALERTS = [
  {symbol:"AWL",name:"AWL",alertPrice:""},{symbol:"ADANIENSOL",name:"ADANIENSOL",alertPrice:""},
  {symbol:"ADANIGREEN",name:"ADANIGREEN",alertPrice:""},{symbol:"NSLNISP",name:"NMDC Steel",alertPrice:""},
@@ -530,17 +531,16 @@ function parseStuckInfo(info){
   const m=String(info||"").match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)\s*$/i);
   return {quantity:m?Number(m[1]):0,buyPrice:m?Number(m[2]):0};
 }
-async function ensureStuckSchema(env){
-  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS stuck_stocks (id INTEGER PRIMARY KEY AUTOINCREMENT, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL DEFAULT 0, buy_price REAL NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
-  await env.AUTH_DB.prepare(`CREATE INDEX IF NOT EXISTS idx_stuck_stocks_order ON stuck_stocks(sort_order,id)`).run();
-}
 async function getStuckData(env){
-  await ensureStuckSchema(env);
-  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
-  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,stuckInfo:`${r.quantity} × ${Number(r.buy_price).toFixed(2)}`,sort_order:Number(r.sort_order||0)}));
+  let rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
+  if(!(rows.results||[]).length){
+    const stm=DEFAULT_STUCK.map((x,i)=>{const p=parseStuckInfo(x.stuckInfo);return env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(x.symbol,x.name,p.quantity,p.buyPrice,i)});
+    await env.AUTH_DB.batch(stm);
+    rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks ORDER BY sort_order,id`).all();
+  }
+  return (rows.results||[]).map(r=>({id:r.id,symbol:r.symbol,name:r.name||r.symbol,stuckInfo:`${r.quantity} × ${Number(r.buy_price).toFixed(2)}`}));
 }
 async function replaceStuckData(env,items){
-  await ensureStuckSchema(env);
   const arr=Array.isArray(items)?items:[];
   const stm=[env.AUTH_DB.prepare(`DELETE FROM stuck_stocks`)];
   arr.forEach((x,i)=>{const symbol=String(x.symbol||"").trim().toUpperCase();if(!symbol)return;const p=parseStuckInfo(x.stuckInfo);stm.push(env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,String(x.name||symbol).trim(),p.quantity,p.buyPrice,i));});
@@ -626,38 +626,54 @@ async function replaceCryptoData(env,items){
     await env.AUTH_DB.batch(clean.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO crypto_watchlist(market,symbol,name,sort_order,added_at) VALUES (?,?,?,?,?)`).bind(x.market,x.symbol,x.name,i,nowIso())));
   }
 }
+async function ensureBuyZoneSchema(env){
+  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS buy_zone_stocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`).run();
+  await env.AUTH_DB.prepare(`CREATE INDEX IF NOT EXISTS idx_buy_zone_order ON buy_zone_stocks(sort_order,id)`).run();
+}
+async function getBuyZoneData(env){
+  await ensureBuyZoneSchema(env);
+  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,sort_order,added_at,updated_at FROM buy_zone_stocks ORDER BY sort_order,id`).all();
+  return rows.results||[];
+}
+async function replaceBuyZoneData(env,items){
+  await ensureBuyZoneSchema(env);
+  const clean=[]; const seen=new Set();
+  for(const x of Array.isArray(items)?items:[]){
+    const symbol=String(x.symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
+    const name=String(x.name||symbol).trim();
+    if(!symbol||seen.has(symbol))continue;
+    seen.add(symbol); clean.push({symbol,name});
+    if(clean.length>=15)break;
+  }
+  const stm=[env.AUTH_DB.prepare(`DELETE FROM buy_zone_stocks`)];
+  clean.forEach((x,i)=>stm.push(env.AUTH_DB.prepare(`INSERT INTO buy_zone_stocks(symbol,name,sort_order,added_at,updated_at) VALUES (?,?,?,?,?)`).bind(x.symbol,x.name,i,nowIso(),nowIso())));
+  await env.AUTH_DB.batch(stm);
+}
+
 async function dataJson(request,env,url){
   if(!url.pathname.startsWith('/api/data/'))return null;
   const session=await currentAuth(request,env);if(!session)return json({error:'Authentication required'},401);
   const admin=session.role==='admin';
+  if(url.pathname==='/api/data/buy-zone'){
+    if(request.method==='GET')return json({items:await getBuyZoneData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+      await replaceBuyZoneData(env,b.items);
+      return json({ok:true,items:await getBuyZoneData(env)});
+    }
+  }
   if(url.pathname==='/api/data/stuck'){
     if(request.method==='GET')return json({items:await getStuckData(env)});
     if(!admin)return json({error:'Admin only'},403);
-    if(request.method==='POST'){
-      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};
-      await ensureStuckSchema(env);
-      const symbol=String(b.symbol||'').trim().toUpperCase();
-      const name=String(b.name||'').trim();
-      const quantity=Number(b.quantity);
-      const buyPrice=Number(b.buyPrice);
-      if(!symbol||!name||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(buyPrice)||buyPrice<=0)return json({error:'Stock name, quantity and buy price are required'},400);
-      const maxRow=await env.AUTH_DB.prepare(`SELECT COALESCE(MAX(sort_order),-1) AS max_order FROM stuck_stocks`).first();
-      const nextOrder=Number(maxRow?.max_order??-1)+1;
-      await env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,name,quantity,buyPrice,nextOrder).run();
-      return json({ok:true,items:await getStuckData(env)});
-    }
     if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceStuckData(env,b.items);return json({ok:true,items:await getStuckData(env)});}
-    if(request.method==='PATCH'){
-      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};
-      const order=Array.isArray(b.order)?b.order.map(Number).filter(Number.isInteger):[];
-      if(!order.length)return json({error:'Order is required'},400);
-      await ensureStuckSchema(env);
-      const rows=await env.AUTH_DB.prepare(`SELECT id FROM stuck_stocks ORDER BY sort_order,id`).all();
-      const existing=(rows.results||[]).map(r=>Number(r.id));
-      if(order.length!==existing.length || new Set(order).size!==existing.length || order.some(id=>!existing.includes(id))) return json({error:'Invalid stock order'},400);
-      await env.AUTH_DB.batch(order.map((id,i)=>env.AUTH_DB.prepare(`UPDATE stuck_stocks SET sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(i,id)));
-      return json({ok:true,items:await getStuckData(env)});
-    }
   }
   if(url.pathname==='/api/data/alerts'){
     if(request.method==='GET')return json({items:await getAlertsData(env)});
@@ -749,38 +765,10 @@ export default {
         const details = detailsResp.ok ? await detailsResp.json() : [];
         const names = new Map((Array.isArray(details)?details:[]).map(x=>[String(x.coindcx_name||'').toUpperCase(), x]));
         const wanted = new Set(requested);
-        const baseResults = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
+        const results = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
           const market=String(x.market||'').toUpperCase(), d=names.get(market)||{};
-          const target=String(d.target_currency_short_name||market.replace(/INR$/,'')).toUpperCase();
-          const base=String(d.base_currency_short_name||'INR').toUpperCase();
-          // CoinDCX documents `pair` in markets_details. Keep it when present,
-          // but build the spot INR pair as a fallback because some market-detail
-          // responses can omit the pair field. For INR spot markets this is I-COIN_INR.
-          const pair=d.pair || `${String(d.ecode||'I').toUpperCase()}-${target}_${base}`;
-          return { market, symbol:target, name:d.target_currency_name||target||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp, pair };
+          return { market, symbol:String(d.target_currency_short_name||market.replace(/INR$/,'')), name:d.target_currency_name||d.target_currency_short_name||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp };
         });
-
-        // CoinDCX ticker gives only 24H high/low. Calculate 1Y high/low
-        // from the last 365 daily candles.
-        const yearResults = await Promise.all(baseResults.map(async item=>{
-          if(!item.pair) return {...item,year_high:null,year_low:null};
-          try{
-            const endTime=Date.now();
-            const startTime=endTime-(365*24*60*60*1000);
-            const candleUrl=`https://api.coindcx.com/market_data/candles?pair=${encodeURIComponent(item.pair)}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=1000`;
-            const cr=await fetch(candleUrl,{headers:{"Accept":"application/json"},cache:"no-store"});
-            if(!cr.ok) return {...item,year_high:null,year_low:null};
-            const candles=await cr.json().catch(()=>[]);
-            const rows=Array.isArray(candles)?candles:(Array.isArray(candles.data)?candles.data:[]);
-            const highs=rows.map(c=>Number(c.high)).filter(Number.isFinite);
-            const lows=rows.map(c=>Number(c.low)).filter(Number.isFinite);
-            return {...item,year_high:highs.length?Math.max(...highs):null,year_low:lows.length?Math.min(...lows):null};
-          }catch(_){
-            return {...item,year_high:null,year_low:null};
-          }
-        }));
-
-        const results=yearResults.map(({pair,...item})=>item);
         return json({ results: requested.length===1 ? (results[0]||null) : results });
       } catch (_) { return json({ error: "Unable to fetch crypto prices" }, 502); }
     }
@@ -842,6 +830,14 @@ export default {
       const symbol = rawSymbol.endsWith(".NS") ? rawSymbol.slice(0, -3) : rawSymbol;
       const yahooSymbol = `${symbol}.NS`;
 
+      // Live quote mode is intentionally lightweight so watchlists can refresh
+      // without downloading the full 2-year technical history each time.
+      const liveQuote = await fetchYahooLiveQuote(symbol);
+      if (url.searchParams.get("live") === "1") {
+        if (liveQuote) return json({ symbol, yahoo_symbol: yahooSymbol, exchange: "NSE", currency: "INR", ...liveQuote });
+        return json({ error: "Live quote unavailable" }, 502);
+      }
+
       // Always fetch Yahoo history separately. The displayed quote/OHLC can come
       // from the NSE historical source, but the dashboard needs the full daily
       // history for 20/50/200 DMA and other technical calculations.
@@ -874,22 +870,23 @@ export default {
         }
       } catch (_) {}
 
-      // Use Yahoo's live intraday market quote as the displayed current price.
-      // EquityPandit is kept only as a fallback when the live quote is unavailable.
-      const live = await fetchYahooLiveQuote(yahooSymbol);
-      if (live) {
+      // Use the latest market quote when Yahoo provides it. This fixes the
+      // previous-day/stale-candle issue while keeping the full daily history
+      // separate for technical calculations.
+      if (liveQuote) {
         return json({
           symbol,
           yahoo_symbol: yahooSymbol,
           exchange: "NSE",
           currency: "INR",
-          ...live,
+          ...liveQuote,
           year_high: yahooData?.meta?.fiftyTwoWeekHigh ?? null,
           year_low: yahooData?.meta?.fiftyTwoWeekLow ?? null,
           history: yahooData?.history || []
         });
       }
 
+      // Fallback to NSE historical data if Yahoo's live quote is unavailable.
       const ep = await fetchEquityPanditQuote(symbol);
       if (ep) {
         return json({
