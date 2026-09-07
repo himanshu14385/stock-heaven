@@ -33,70 +33,94 @@ function formatStuckPrice(value) {
     return `₹${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function showStuckSuggestions() {
-    const input = document.getElementById("stuckSearchInput");
-    const box = document.getElementById("stuckSuggestions");
+let stuckAddSelectedSymbol = "";
+let stuckAddSearchTimer = null;
+let stuckAddSearchResults = [];
+
+function clearStuckAddSelection() {
+    stuckAddSelectedSymbol = "";
+    const nameInput = document.getElementById("stuckAddName");
+    if (nameInput) nameInput.dataset.selected = "";
+}
+
+function showStuckAddSuggestions() {
+    const input = document.getElementById("stuckAddName");
+    const box = document.getElementById("stuckAddSuggestions");
     if (!input || !box) return;
 
-    const query = input.value.trim().toUpperCase();
+    clearTimeout(stuckAddSearchTimer);
+    const query = input.value.trim();
     if (!query) {
         box.innerHTML = "";
         box.style.display = "none";
+        clearStuckAddSelection();
         return;
     }
 
-    const matches = stuckStocks.filter(stock =>
-        stock.symbol.toUpperCase().includes(query) ||
-        stock.name.toUpperCase().includes(query)
-    ).slice(0, 8);
-
-    if (!matches.length) {
-        box.innerHTML = `<div class="suggestion-empty">No stock found</div>`;
-        box.style.display = "block";
+    // Typing after selecting a stock means the previous selection is no longer valid.
+    clearStuckAddSelection();
+    if (query.length < 2) {
+        box.innerHTML = "";
+        box.style.display = "none";
         return;
     }
 
-    box.innerHTML = matches.map(stock => `
-        <button class="stock-suggestion-item" onclick="selectStuckStock('${stock.symbol.replace(/'/g, "\\'")}')">
-            <span><strong>${displaySymbol(stock.symbol)}</strong><small>${stock.name}</small></span>
-        </button>
-    `).join("");
+    box.innerHTML = `<div class="suggestion-empty">Searching stocks...</div>`;
     box.style.display = "block";
+
+    stuckAddSearchTimer = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.error) throw new Error(data.error || "Stock search failed");
+
+            const matches = Array.isArray(data.results) ? data.results.slice(0, 8) : [];
+            stuckAddSearchResults = matches.map(stock => ({
+                symbol: cleanSymbol(stock.symbol || ""),
+                name: String(stock.name || stock.symbol || "").trim()
+            }));
+            if (!matches.length) {
+                box.innerHTML = `<div class="suggestion-empty">No stock found</div>`;
+                box.style.display = "block";
+                return;
+            }
+
+            box.innerHTML = stuckAddSearchResults.map((stock, index) => `
+                <button type="button" class="stuck-add-suggestion-item" onclick="selectStuckAddStockByIndex(${index})">
+                    <strong>${escapeStuckHtml(stock.name)}</strong>
+                    <small>${escapeStuckHtml(displaySymbol(stock.symbol))}</small>
+                </button>
+            `).join("");
+            box.style.display = "block";
+        } catch (_) {
+            box.innerHTML = `<div class="suggestion-empty">Stock search unavailable</div>`;
+            box.style.display = "block";
+        }
+    }, 250);
 }
 
-
-function selectStuckStock(symbol) {
-    const input = document.getElementById("stuckSearchInput");
-    const box = document.getElementById("stuckSuggestions");
-    if (input) input.value = symbol;
+function selectStuckAddStockByIndex(index) {
+    const stock = stuckAddSearchResults[index];
+    if (!stock) return;
+    const nameInput = document.getElementById("stuckAddName");
+    const box = document.getElementById("stuckAddSuggestions");
+    stuckAddSelectedSymbol = cleanSymbol(stock.symbol);
+    if (nameInput) {
+        nameInput.value = stock.name || stuckAddSelectedSymbol;
+        nameInput.dataset.selected = stuckAddSelectedSymbol;
+    }
     if (box) {
         box.style.display = "none";
         box.innerHTML = "";
     }
-    showStuckQuote(symbol);
 }
 
-function handleStuckSearch(event) {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        searchFromStuckPage();
-    }
-}
-
-async function showStuckQuote(symbol) {
-    const input = document.getElementById("stuckSearchInput");
-    const box = document.getElementById("stuckSuggestions");
-    const card = document.getElementById("stuckQuote");
+function showStuckQuote(symbol) {
     const normalized = cleanSymbol(symbol);
-    if (!normalized) return;
+    const card = document.getElementById("stuckQuote");
+    if (!normalized || !card) return;
 
-    if (input) input.value = normalized;
-    if (box) {
-        box.style.display = "none";
-        box.innerHTML = "";
-    }
-    if (card) card.style.display = "block";
-
+    card.style.display = "block";
     document.getElementById("stuckSymbol").textContent = displaySymbol(normalized);
     document.getElementById("stuckCompany").textContent = "Loading...";
     document.getElementById("stuckPrice").textContent = "₹--";
@@ -106,44 +130,33 @@ async function showStuckQuote(symbol) {
     document.getElementById("stuck52High").textContent = "--";
     document.getElementById("stuck52Low").textContent = "--";
 
-    try {
-        const response = await fetch(`/api/stock?symbol=${encodeURIComponent(normalized)}`);
-        const result = await response.json();
-        if (!response.ok || result.error) throw new Error(result.error || "Stock not found");
+    fetch(`/api/stock?symbol=${encodeURIComponent(normalized)}`, { cache: "no-store" })
+        .then(async response => {
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.error) throw new Error(result.error || "Stock not found");
+            return result;
+        })
+        .then(result => {
+            const found = stuckStocks.find(stock => cleanSymbol(stock.symbol) === normalized);
+            document.getElementById("stuckCompany").textContent = found ? found.name : (result.name || normalized);
+            document.getElementById("stuckPrice").textContent = formatStuckPrice(result.price);
+            document.getElementById("stuckHigh").textContent = formatStuckPrice(result.day_high);
+            document.getElementById("stuckLow").textContent = formatStuckPrice(result.day_low);
+            document.getElementById("stuck52High").textContent = formatStuckPrice(result.year_high);
+            document.getElementById("stuck52Low").textContent = formatStuckPrice(result.year_low);
 
-        const found = stuckStocks.find(
-            stock => cleanSymbol(stock.symbol) === normalized
-        );
-
-        document.getElementById("stuckCompany").textContent =
-            found ? found.name : normalized;
-        document.getElementById("stuckPrice").textContent = formatStuckPrice(result.price);
-        document.getElementById("stuckHigh").textContent = formatStuckPrice(result.day_high);
-        document.getElementById("stuckLow").textContent = formatStuckPrice(result.day_low);
-        document.getElementById("stuck52High").textContent = formatStuckPrice(result.year_high);
-        document.getElementById("stuck52Low").textContent = formatStuckPrice(result.year_low);
-
-        const change = Number(result.change);
-        const pct = Number(result.percent_change);
-        const changeEl = document.getElementById("stuckChange");
-        if (!Number.isNaN(change) && !Number.isNaN(pct)) {
-            changeEl.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${change >= 0 ? "+" : ""}${pct.toFixed(2)}%)`;
-            changeEl.classList.toggle("negative", change < 0);
-        }
-    } catch (error) {
-        document.getElementById("stuckCompany").textContent = "Data unavailable";
-        document.getElementById("stuckPrice").textContent = "--";
-    }
-}
-
-function searchFromStuckPage() {
-    const input = document.getElementById("stuckSearchInput");
-    const symbol = input ? input.value.trim() : "";
-    if (!symbol) {
-        alert("Stock name ya symbol enter karo");
-        return;
-    }
-    showStuckQuote(symbol);
+            const change = Number(result.change);
+            const pct = Number(result.percent_change);
+            const changeEl = document.getElementById("stuckChange");
+            if (!Number.isNaN(change) && !Number.isNaN(pct)) {
+                changeEl.textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)} (${change >= 0 ? "+" : ""}${pct.toFixed(2)}%)`;
+                changeEl.classList.toggle("negative", change < 0);
+            }
+        })
+        .catch(() => {
+            document.getElementById("stuckCompany").textContent = "Data unavailable";
+            document.getElementById("stuckPrice").textContent = "--";
+        });
 }
 
 async function getStuckStockPrice(symbol) {
@@ -214,6 +227,10 @@ function openAddStuckStock() {
     modal.setAttribute("aria-hidden", "false");
     const form = document.getElementById("stuckAddForm");
     if (form) form.reset();
+    stuckAddSelectedSymbol = "";
+    stuckAddSearchResults = [];
+    const suggestions = document.getElementById("stuckAddSuggestions");
+    if (suggestions) { suggestions.style.display = "none"; suggestions.innerHTML = ""; }
     const status = document.getElementById("stuckAddStatus");
     if (status) status.textContent = "";
     setTimeout(() => document.getElementById("stuckAddName")?.focus(), 50);
@@ -235,51 +252,40 @@ async function addStuckStock() {
     if (!window.requireAdmin()) return;
 
     const nameInput = document.getElementById("stuckAddName");
-    const symbolInput = document.getElementById("stuckAddSymbol");
     const qtyInput = document.getElementById("stuckAddQty");
     const buyInput = document.getElementById("stuckAddBuyPrice");
     const status = document.getElementById("stuckAddStatus");
     const saveBtn = document.getElementById("stuckAddSave");
 
     const name = nameInput?.value.trim() || "";
-    const symbol = cleanSymbol(symbolInput?.value || "");
+    const symbol = cleanSymbol(stuckAddSelectedSymbol || nameInput?.dataset.selected || "");
     const quantity = Number(qtyInput?.value);
     const buyPrice = Number(buyInput?.value);
 
     if (!name) { alert("Stock name enter kijiye"); nameInput?.focus(); return; }
-    if (!symbol) { alert("Stock symbol enter kijiye"); symbolInput?.focus(); return; }
+    if (!symbol) { alert("Suggestion me se stock select kijiye"); nameInput?.focus(); return; }
     if (!Number.isFinite(quantity) || quantity <= 0) { alert("Valid quantity enter kijiye"); qtyInput?.focus(); return; }
     if (!Number.isFinite(buyPrice) || buyPrice <= 0) { alert("Valid buy price enter kijiye"); buyInput?.focus(); return; }
 
-    if (status) { status.className = "stuck-add-status loading"; status.textContent = "Live price verify ho raha hai..."; }
+    if (status) { status.className = "stuck-add-status loading"; status.textContent = "Database me stock add ho raha hai..."; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...'; }
 
     try {
-        // Validate the symbol against the same live stock API used by the list.
-        const quoteResponse = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`, { cache: "no-store" });
-        const quote = await quoteResponse.json().catch(() => ({}));
-        if (!quoteResponse.ok || quote.error || !Number.isFinite(Number(quote.price))) {
-            throw new Error("Stock symbol se live price nahi mila. Symbol check kijiye.");
-        }
-
-        stuckStocks.push({
-            symbol,
-            name,
-            stuckInfo: `${quantity} × ${buyPrice.toFixed(2)}`
+        const response = await fetch('/api/data/stuck', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify({ symbol, name, quantity, buyPrice })
         });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.error) throw new Error(data.error || "Stock add nahi hua.");
 
-        await saveStuckStockSettings();
+        stuckStocks = Array.isArray(data.items) ? data.items : stuckStocks;
         closeAddStuckStock();
         await loadStuckStocks();
-
-        // Keep the newly added stock visible/selected with its live price.
         showStuckQuote(symbol);
     } catch (error) {
-        // If saving failed, do not leave an unsaved item in the local array.
-        const last = stuckStocks[stuckStocks.length - 1];
-        if (last && last.symbol === symbol && last.name === name && last.stuckInfo === `${quantity} × ${buyPrice.toFixed(2)}`) {
-            stuckStocks.pop();
-        }
         if (status) { status.className = "stuck-add-status error"; status.textContent = error.message || "Stock add nahi hua."; }
     } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Stock'; }

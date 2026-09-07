@@ -527,3 +527,65 @@
         grid-column: 1 / -1;
     }
 }
+
+
+/* Stock-name suggestions inside Add Stock */
+.stuck-add-name-wrap {
+    position: relative;
+}
+
+.stuck-add-suggestions {
+    position: absolute;
+    z-index: 20;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: none;
+    margin-top: 5px;
+    background: #fff;
+    border: 1px solid #dfe5ef;
+    border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(30, 48, 84, .14);
+    overflow: hidden;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.stuck-add-suggestion-item {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #eef1f6;
+    background: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.stuck-add-suggestion-item:last-child {
+    border-bottom: 0;
+}
+
+.stuck-add-suggestion-item:hover {
+    background: #f7f9ff;
+}
+
+.stuck-add-suggestion-item strong {
+    color: #27334a;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.stuck-add-suggestion-item small {
+    color: #8490a4;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.suggestion-empty {
+    padding: 11px 12px;
+    color: #8490a4;
+    font-size: 11px;
+}

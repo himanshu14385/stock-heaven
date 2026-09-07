@@ -7,7 +7,7 @@
     <title>Stuck Stock • Stock Heaven</title>
 
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="stuck-stock.css?v=20260907-add1">
+    <link rel="stylesheet" href="stuck-stock.css?v=20260907-add2">
 
     <link
         rel="stylesheet"
@@ -167,27 +167,6 @@
     </div>
 </nav>
 
-<section class="search-section">
-    <div class="search-wrapper">
-        <div class="search-box">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input
-                type="text"
-                id="stuckSearchInput"
-                placeholder="Search stock name or symbol..."
-                autocomplete="off"
-                oninput="showStuckSuggestions()"
-                onkeydown="handleStuckSearch(event)"
-            >
-        </div>
-        <div id="stuckSuggestions" class="stock-suggestions"></div>
-    </div>
-    <button class="analyze-btn" onclick="searchFromStuckPage()">
-        <i class="fa-solid fa-chart-line"></i>
-        Analyze
-    </button>
-</section>
-
 <!-- SEARCH RESULT: ONLY THE SMALL QUOTE CARD -->
 <section id="stuckQuote" class="stock-overview stuck-quote" style="display:none;">
     <div class="stock-main">
@@ -267,13 +246,10 @@
 
         <form id="stuckAddForm" onsubmit="event.preventDefault(); addStuckStock();">
             <div class="stuck-add-grid">
-                <label class="stuck-add-field stuck-add-wide">
+                <label class="stuck-add-field stuck-add-wide stuck-add-name-wrap">
                     <span>Stock Name</span>
-                    <input id="stuckAddName" type="text" placeholder="e.g. Reliance Industries Limited" autocomplete="off">
-                </label>
-                <label class="stuck-add-field">
-                    <span>Stock Symbol</span>
-                    <input id="stuckAddSymbol" type="text" placeholder="e.g. RELIANCE" autocomplete="off">
+                    <input id="stuckAddName" type="text" placeholder="Type stock name..." autocomplete="off" oninput="showStuckAddSuggestions()">
+                    <div id="stuckAddSuggestions" class="stuck-add-suggestions"></div>
                 </label>
                 <label class="stuck-add-field">
                     <span>Quantity</span>
