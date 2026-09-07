@@ -127,7 +127,7 @@ async function getStuckStockPrice(symbol) {
     }
 }
 
-function renderStuckStocks() {
+function renderStuckStocks(animateFrom = null) {
     const container = document.getElementById("stuckStockList");
     const updated = document.getElementById("stuckUpdated");
     if (!container) return;
@@ -167,6 +167,29 @@ function renderStuckStocks() {
 
     if (updated) {
         updated.textContent = "Prices fetched: " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    // FLIP animation: after a swap, cards travel from their old grid
+    // positions to their new grid positions instead of appearing to jump.
+    if (animateFrom && animateFrom.size) {
+        requestAnimationFrame(() => {
+            container.querySelectorAll('.stuck-stock-row[data-stuck-id]').forEach(row => {
+                const id = String(row.dataset.stuckId || '');
+                const previous = animateFrom.get(id);
+                if (!previous) return;
+                const current = row.getBoundingClientRect();
+                const dx = previous.left - current.left;
+                const dy = previous.top - current.top;
+                if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+                row.animate(
+                    [
+                        { transform: `translate(${dx}px, ${dy}px)` },
+                        { transform: 'translate(0, 0)' }
+                    ],
+                    { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' }
+                );
+            });
+        });
     }
 }
 
@@ -267,9 +290,8 @@ document.addEventListener("keydown", handleAddStuckKey);
 let draggedStuckIndex = null;
 let stuckReorderSaving = false;
 
-// Deliberately follows the Favourite Stock reorder pattern:
-// full row is draggable, the left grip is visual only, the array is moved
-// on drop, then the saved order is rendered without refetching prices.
+// Native full-row drag/drop, matching the Favourite Stock interaction.
+// A drop is a TRUE SWAP: the dragged card and target card exchange positions.
 function dragStuck(event, index) {
     if (!window.requireAdmin() || editingStuckIndex !== null || stuckReorderSaving) {
         event.preventDefault();
@@ -285,6 +307,12 @@ function allowStuckDrop(event) {
     if (draggedStuckIndex === null) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+
+    document.querySelectorAll("#stuckStockList .stuck-stock-row.stuck-drag-over").forEach(row => {
+        if (row !== event.currentTarget) row.classList.remove("stuck-drag-over");
+    });
+    if (event.currentTarget !== event.target.closest?.('.stuck-stock-row')) return;
+    event.currentTarget.classList.add("stuck-drag-over");
 }
 
 function dropStuck(event, targetIndex) {
@@ -305,13 +333,20 @@ function dropStuck(event, targetIndex) {
     if (!Number.isInteger(from) || !Number.isInteger(target) || from === target) return;
     if (!stuckStocks[from] || !stuckStocks[target]) return;
 
-    const [item] = stuckStocks.splice(from, 1);
-    const insertAt = from < target ? target - 1 : target;
-    stuckStocks.splice(insertAt, 0, item);
+    // Capture positions before changing the grid so the two cards can
+    // animate directly into each other's old position.
+    const previousRects = new Map();
+    document.querySelectorAll("#stuckStockList .stuck-stock-row[data-stuck-id]").forEach(row => {
+        previousRects.set(String(row.dataset.stuckId || ''), row.getBoundingClientRect());
+    });
 
-    // Instant UI update. renderStuckStocks() only uses cached prices, so
-    // there is no loading spinner and no price API call during reorder.
-    renderStuckStocks();
+    // TRUE SWAP — do not splice/remove/insert. This prevents the cards
+    // between source and target from shifting position.
+    const temp = stuckStocks[from];
+    stuckStocks[from] = stuckStocks[target];
+    stuckStocks[target] = temp;
+
+    renderStuckStocks(previousRects);
 
     const orderedIds = stuckStocks
         .map(stock => Number(stock.id))
@@ -350,7 +385,6 @@ async function persistStuckOrder(order) {
         }
     } catch (error) {
         console.error('Stuck Stock reorder save failed:', error);
-        // Restore the authoritative D1 order only if the save actually failed.
         try {
             await loadStuckData();
             renderStuckStocks();
