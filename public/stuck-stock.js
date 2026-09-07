@@ -139,10 +139,12 @@ function renderStuckStocks(animateFrom = null) {
         <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}"
              onclick="showStuckQuote('${String(stock.symbol || '').replace(/'/g, "\\'")}')"
              ondragstart="dragStuck(event, ${index})" ondragover="allowStuckDrop(event)" ondrop="dropStuck(event, ${index})">
-            <div class="stuck-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
-            <div class="ssname-wrap">
-                <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
-                <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
+            <div class="handle_sssname_wrap">
+                <div class="stuck-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
+                <div class="ssname-wrap">
+                    <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
+                    <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
+                </div>
             </div>
             <div class="stuck-row-right">
                 ${editingStuckIndex !== index
