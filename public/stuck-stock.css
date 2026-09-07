@@ -573,20 +573,3 @@
     color: #8490a4;
     font-size: 11px;
 }
-
-.ssname-wrap {
-    display: flex;
-    flex-direction: column;
-    text-align: right;
-    row-gap: 5px;
-}
-
-span.mystuckprice {
-    font-size: 13px;
-    color: #F44336;
-    font-weight: 600;
-}
-
-.dnone {
-    display: none !important;
-}

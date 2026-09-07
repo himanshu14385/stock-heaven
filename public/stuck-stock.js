@@ -303,7 +303,9 @@ function applyStuckDomOrder() {
     const container = document.getElementById("stuckStockList");
     if (!container) return;
 
-    const cards = Array.from(container.querySelectorAll(".stuck-stock-row[draggable='true']"));
+    // Cards themselves are not draggable; only the left grip is. Use the
+    // card class here so the already-rendered cards can be reordered instantly.
+    const cards = Array.from(container.querySelectorAll(".stuck-stock-row"));
     const byId = new Map(cards.map(card => [String(card.dataset.stuckId || ""), card]));
 
     stuckStocks.forEach((stock, index) => {
@@ -318,10 +320,17 @@ async function reorderStuckByDrag(from, to) {
     if (!window.requireAdmin() || stuckReorderSaving) return;
     if (from < 0 || from >= stuckStocks.length || to < 0 || to >= stuckStocks.length) return;
 
+    const previous = [...stuckStocks];
     const next = [...stuckStocks];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
+
+    // Optimistic UI: move the existing cards immediately. Do not reload or
+    // refetch prices, so the live price stays attached to its stock card.
+    stuckStocks = next;
+    applyStuckDomOrder();
     stuckReorderSaving = true;
+
     try {
         const response = await fetch('/api/data/stuck', {
             method: 'PATCH',
@@ -332,14 +341,19 @@ async function reorderStuckByDrag(from, to) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.error) throw new Error(data.error || 'Reorder failed');
-        // Reorder only the existing DOM cards. Do NOT call loadStuckStocks() here:
-        // that function refetches every live price and briefly shows "Loading prices...".
-        // Drag/drop should move the cards instantly while keeping their already-fetched prices.
-        stuckStocks = Array.isArray(data.items) ? data.items : next;
+
+        // Keep the already-rendered cards and their prices. The server response
+        // only confirms/synchronizes the saved order; no price reload is needed.
+        if (Array.isArray(data.items) && data.items.length === next.length) {
+            const serverById = new Map(data.items.map(item => [String(item.id), item]));
+            stuckStocks = next.map(stock => serverById.get(String(stock.id)) || stock);
+        }
         applyStuckDomOrder();
     } catch (error) {
-        await loadStuckData();
-        await loadStuckStocks();
+        // Revert only the order. Do not call loadStuckStocks(), because that
+        // would refetch every price and show the loading state again.
+        stuckStocks = previous;
+        applyStuckDomOrder();
         alert(error.message || 'Reorder failed');
     } finally {
         stuckReorderSaving = false;
