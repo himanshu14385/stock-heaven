@@ -29,11 +29,11 @@ function render(){
         <div class="change-wrap">${changeHtml(c.change_24_hour)}<small>24H</small></div>
       </div>
       <div class="crypto-metrics">
-        <div><span>24H HIGH</span><b>${priceFmt(c.high)}</b></div>
         <div><span>24H LOW</span><b>${priceFmt(c.low)}</b></div>
+        <div><span>24H HIGH</span><b>${priceFmt(c.high)}</b></div>
         <div><span>24H VOLUME</span><b>${shortNum(c.volume)}</b></div>
-        <div><span>1Y HIGH</span><b>${priceFmt(c.year_high)}</b></div>
         <div><span>1Y LOW</span><b>${priceFmt(c.year_low)}</b></div>
+        <div><span>1Y HIGH</span><b>${priceFmt(c.year_high)}</b></div>
       </div>
       <div class="crypto-card-foot"><span class="live-dot"><i class="fa-solid fa-circle"></i> Live CoinDCX</span><span>#${i+1}</span></div>
    </article>`
