@@ -33,21 +33,6 @@ function num(v) {
   const n = Number(s.replace(/[^0-9.+-]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
-
-function calculateATR(history, period = 14) {
-  const rows = Array.isArray(history) ? history : [];
-  const tr = [];
-  for (let i = 1; i < rows.length; i++) {
-    const high = Number(rows[i]?.high);
-    const low = Number(rows[i]?.low);
-    const prevClose = Number(rows[i - 1]?.close);
-    if (![high, low, prevClose].every(Number.isFinite)) continue;
-    tr.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
-  }
-  if (tr.length < period) return null;
-  return tr.slice(-period).reduce((sum, value) => sum + value, 0) / period;
-}
-
 function slugifyName(name) {
   return String(name || "")
     .toLowerCase()
@@ -691,10 +676,32 @@ export default {
         const details = detailsResp.ok ? await detailsResp.json() : [];
         const names = new Map((Array.isArray(details)?details:[]).map(x=>[String(x.coindcx_name||'').toUpperCase(), x]));
         const wanted = new Set(requested);
-        const results = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
+        const baseResults = (Array.isArray(tickers)?tickers:[]).filter(x=>wanted.has(String(x.market||'').toUpperCase())).map(x=>{
           const market=String(x.market||'').toUpperCase(), d=names.get(market)||{};
-          return { market, symbol:String(d.target_currency_short_name||market.replace(/INR$/,'')), name:d.target_currency_name||d.target_currency_short_name||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp };
+          return { market, symbol:String(d.target_currency_short_name||market.replace(/INR$/,'')), name:d.target_currency_name||d.target_currency_short_name||market.replace(/INR$/,''), last_price:Number(x.last_price), change_24_hour:Number(x.change_24_hour), high:Number(x.high), low:Number(x.low), volume:Number(x.volume), timestamp:x.timestamp, pair:d.pair||null };
         });
+
+        // CoinDCX ticker gives only 24H high/low. Calculate 1Y high/low
+        // from the last 365 daily candles.
+        const yearResults = await Promise.all(baseResults.map(async item=>{
+          if(!item.pair) return {...item,year_high:null,year_low:null};
+          try{
+            const endTime=Date.now();
+            const startTime=endTime-(365*24*60*60*1000);
+            const candleUrl=`https://api.coindcx.com/market_data/candles?pair=${encodeURIComponent(item.pair)}&interval=1d&startTime=${startTime}&endTime=${endTime}&limit=366`;
+            const cr=await fetch(candleUrl,{headers:{"Accept":"application/json"},cache:"no-store"});
+            if(!cr.ok) return {...item,year_high:null,year_low:null};
+            const candles=await cr.json().catch(()=>[]);
+            const rows=Array.isArray(candles)?candles:(Array.isArray(candles.data)?candles.data:[]);
+            const highs=rows.map(c=>Number(c.high)).filter(Number.isFinite);
+            const lows=rows.map(c=>Number(c.low)).filter(Number.isFinite);
+            return {...item,year_high:highs.length?Math.max(...highs):null,year_low:lows.length?Math.min(...lows):null};
+          }catch(_){
+            return {...item,year_high:null,year_low:null};
+          }
+        }));
+
+        const results=yearResults.map(({pair,...item})=>item);
         return json({ results: requested.length===1 ? (results[0]||null) : results });
       } catch (_) { return json({ error: "Unable to fetch crypto prices" }, 502); }
     }
