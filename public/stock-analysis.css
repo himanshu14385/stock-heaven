@@ -8,3 +8,10 @@
 .analysis-table-card.container-fluid{width:100%;max-width:none;margin:0;border-radius:10px}
 .analysis-table-card.container-fluid .analysis-table{min-width:1280px}
 @media(max-width:700px){.analysis-control-container{padding:12px}.analysis-control-container .analysis-summary{grid-template-columns:repeat(5,110px)}}
+
+
+/* Buy Zone UI fixes */
+.current-view-badge{display:inline-flex;align-items:center;justify-content:center;min-width:48px;height:24px;padding:0 9px;border-radius:6px;font-size:10px;font-weight:900;line-height:1}
+.current-view-badge:not(.view-hold):not(.view-sell){background:#dff8e9;color:#09884a;border:1px solid #c7eed7}
+.current-view-badge.view-hold{background:#fff1cc;color:#a16a00;border:1px solid #f0dfac}
+.current-view-badge.view-sell{background:#ffe0e2;color:#dc2f38;border:1px solid #f4c8cc}

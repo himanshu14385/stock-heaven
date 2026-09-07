@@ -134,10 +134,20 @@
     const peerPes=(entry.peers?.peers||[]).map(x=>n(x.pe)).filter(x=>x!=null&&x>0&&x<200);
     const peerPe=median(peerPes);
     const basePe=selectedPe!=null&&selectedPe>0 ? selectedPe : null;
-    const fairPe=peerPe!=null ? peerPe : basePe;
+    // Peer PE can occasionally be parsed incorrectly or contain a very distant outlier.
+    // Never let that produce a nonsensical fair value. If peer PE is outside a sane
+    // range versus the selected stock's PE, fall back to the stock's own PE.
+    const peerIsSane = peerPe!=null && basePe!=null && peerPe >= basePe*0.50 && peerPe <= basePe*2.00;
+    const fairPe = peerIsSane ? peerPe : basePe;
     let fairValue=null, eps=null;
-    if(price!=null&&basePe!=null&&basePe>0&&fairPe!=null){eps=price/basePe;fairValue=eps*fairPe;}
-    const fair=fairValue!=null?fairValue:price;
+    if(price!=null&&basePe!=null&&basePe>0&&fairPe!=null){
+      eps=price/basePe;
+      fairValue=eps*fairPe;
+    }
+    // Buy price = 95% of the calculated fair value. This is the upper edge of BUY;
+    // below 80% of fair value is STRONG BUY.
+    const buyPrice=fairValue!=null ? fairValue*0.95 : null;
+    const strongBuyPrice=fairValue!=null ? fairValue*0.80 : null;
     let zone='HOLD', zoneClass='hold';
     if(price!=null&&fairValue!=null){
       const ratio=price/fairValue;
@@ -146,7 +156,7 @@
       else if(ratio<=1.10){zone='HOLD';zoneClass='hold';}
       else {zone='SELL';zoneClass='sell';}
     }
-    return {t,selectedPe,peerPe,fairValue,fair,eps,zone,zoneClass};
+    return {t,selectedPe,peerPe,fairValue,buyPrice,strongBuyPrice,fair:fairValue,eps,zone,zoneClass};
   }
 
   function render(){
@@ -180,7 +190,8 @@
     if(e.loading)return `<tr><td>${i+1}</td><td colspan="6"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td><td></td></tr>`;
     const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t, price=t.price, ch=n(d.change), pct=n(d.percent_change);
     const [rsiStatus,rsiType]=rsiState(t.rsi); const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
-    const s20Type=t.s20==null?'warn':t.near(t.s20)?'warn':price>t.s20?'good':'bad'; const s50Type=t.s50==null?'warn':t.near(t.s50)?'warn':price>t.s50?'good':'bad'; const s200Type=t.s200==null?'warn':t.near(t.s200)?'warn':price>t.s200?'good':'bad';
+    // Status and colour must always agree: Bullish = green, Bearish = red.
+    const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad'; const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad'; const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
     let bbLabel='—',bbStatus='Neutral',bbType='warn'; if(t.bb&&price!=null){if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}else{bbLabel='In Range';bbStatus='Neutral';bbType='warn'}}
     const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad'; const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
     const trendType=t.trend==='Uptrend'?'good':t.trend==='Downtrend'?'bad':'warn';
@@ -190,8 +201,8 @@
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
       <td><div class="price-main">${money(price)}</div><div class="price-change ${ch!=null&&ch>=0?'up':'down'}">${ch==null?'—':(ch>=0?'+':'')+fixed(ch)} (${pct==null?'—':(pct>=0?'+':'')+fixed(pct,2)+'%'})</div></td>
-      <td><span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span><div class="zone-range">Fair: <b>${money(a.fairValue)}</b></div></td>
-      <td><div class="view-box ${currentClass}"><div class="view-icon"><i class="fa-solid fa-bullseye"></i></div><div class="view-text">Current View<b>${currentView}</b></div></div></td>
+      <td><span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span><div class="zone-range">Buy Price: <b>${money(a.buyPrice)}</b></div></td>
+      <td><span class="current-view-badge ${currentClass}">${currentView}</span></td>
       <td><div class="tech-grid">
         ${techCell('RSI (14)',fixed(t.rsi,1),rsiStatus,rsiType)}
         ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',macBull?'Bullish':'Bearish',macType)}
