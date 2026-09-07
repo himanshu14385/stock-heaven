@@ -79,11 +79,11 @@ async function loadCoins(){
  }catch(e){setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Unable to load crypto watchlist.')}`,'error')}
 }
 async function getTicker(market){
- const r=await fetch(`/api/crypto/ticker?market=${encodeURIComponent(market)}`,{cache:'no-store'});
- const d=await r.json().catch(()=>({}));
- if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
- if(!d.market)throw Error('CoinDCX did not return a valid market price. Please try again.');
- return d;
+  const r=await fetch(`/api/crypto/ticker?market=${encodeURIComponent(market)}`,{cache:'no-store'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
+  if(d.last_price==null && d.price==null)throw Error('CoinDCX did not return a valid market price. Please try again.');
+  return {...d,market:d.market||market};
 }
 async function addCoin(market){
  if(!market)return;
@@ -94,7 +94,8 @@ async function addCoin(market){
  setStatus('<i class="fa-solid fa-spinner fa-spin"></i> Fetching live CoinDCX price…','loading');
  try{
    const d=await getTicker(market);
-   const coin={market:d.market,symbol:d.symbol,name:d.name,last_price:d.last_price,change_24_hour:d.change_24_hour,high:d.high,low:d.low,volume:d.volume,timestamp:d.timestamp};
+    const found=cryptoMarkets.find(x=>String(x.market||'')===String(market))||{};
+    const coin={market:d.market||found.market||market,symbol:d.symbol||found.symbol||String(market).replace(/INR$/i,''),name:d.name||found.name||String(market).replace(/INR$/i,''),last_price:d.last_price??d.price,change_24_hour:d.change_24_hour,high:d.high,low:d.low,volume:d.volume,timestamp:d.timestamp};
    const next=[...cryptoCoins,coin];
    render();
    const saved=await saveCoins(next);
@@ -119,13 +120,13 @@ async function refreshPrices(){
    const markets=cryptoCoins.map(c=>c.market).join(',');
    const r=await fetch(`/api/crypto/ticker?markets=${encodeURIComponent(markets)}`,{cache:'no-store'});
    const d=await r.json().catch(()=>({}));
-   if(!r.ok||d.error)throw Error(d.error||'Crypto price unavailable');
+   if(!r.ok||d.error)return;
    const list=Array.isArray(d.results)?d.results:(d.results?[d.results]:[]);
    const map=new Map(list.map(x=>[x.market,x]));
    cryptoCoins=cryptoCoins.map(c=>map.get(c.market)?{...c,...map.get(c.market)}:c);
    render();
    const stamp=$('cryptoLastUpdate');if(stamp)stamp.textContent='Updated just now';
- }catch(e){throw e;}
+ }catch(_){/* keep last known price */}
 }
 
 
@@ -158,7 +159,7 @@ async function manualRefreshPrices(){
 }
 
 const input=$('cryptoInput');
-if(input)input.addEventListener('input',()=>{clearTimeout(searchTimer);const q=input.value.trim();if(!q){$('cryptoSuggestions').style.display='none';return}searchTimer=setTimeout(async()=>{try{showSuggestions(await searchCrypto(q))}catch(_){showSuggestions([])}},160)});
+if(input)input.addEventListener('input',()=>{clearTimeout(searchTimer);setStatus('','');const q=input.value.trim();if(!q){$('cryptoSuggestions').style.display='none';return}searchTimer=setTimeout(async()=>{try{showSuggestions(await searchCrypto(q))}catch(_){showSuggestions([])}},160)});
 if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const q=input.value.trim();if(q)searchCrypto(q).then(x=>x[0]&&addCoin(x[0].market)).catch(e=>setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Search failed.')}`,'error'))}});
 const refreshBtn=$('cryptoRefreshBtn');if(refreshBtn)refreshBtn.addEventListener('click',manualRefreshPrices);
 const addBtn=$('cryptoAddBtn');if(addBtn)addBtn.addEventListener('click',()=>{const q=input?.value.trim();if(q)searchCrypto(q).then(x=>x[0]?addCoin(x[0].market):setStatus('<i class="fa-solid fa-circle-info"></i> No INR coin found for that search.','info')).catch(e=>setStatus(`<i class="fa-solid fa-circle-exclamation"></i> ${esc(e.message||'Search failed.')}`,'error'))});
