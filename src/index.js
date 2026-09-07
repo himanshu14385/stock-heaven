@@ -172,6 +172,63 @@ function marketQuote(q) {
 }
 
 
+async function fetchYahooLiveQuote(yahooSymbol) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?range=1d&interval=1m&events=div%2Csplits`;
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/plain,*/*"
+      },
+      cache: "no-store"
+    });
+    if (!r.ok) return null;
+    const body = await r.json();
+    const result = body?.chart?.result?.[0];
+    if (!result) return null;
+
+    const meta = result.meta || {};
+    const timestamps = result.timestamp || [];
+    const quote = result.indicators?.quote?.[0] || {};
+    const rows = timestamps.map((time, i) => ({
+      time,
+      open: quote.open?.[i] ?? null,
+      high: quote.high?.[i] ?? null,
+      low: quote.low?.[i] ?? null,
+      close: quote.close?.[i] ?? null,
+      volume: quote.volume?.[i] ?? null
+    })).filter(x => x.close != null && Number.isFinite(Number(x.close)));
+
+    const latest = rows[rows.length - 1] || null;
+    const current = Number.isFinite(Number(meta.regularMarketPrice))
+      ? Number(meta.regularMarketPrice)
+      : Number(latest?.close);
+    if (!Number.isFinite(current)) return null;
+
+    const previous = Number.isFinite(Number(meta.previousClose))
+      ? Number(meta.previousClose)
+      : (Number.isFinite(Number(meta.chartPreviousClose)) ? Number(meta.chartPreviousClose) : null);
+    const change = Number.isFinite(previous) ? current - previous : null;
+    const percentChange = Number.isFinite(previous) && previous !== 0 ? (change / previous) * 100 : null;
+
+    return {
+      price: current,
+      previous_close: Number.isFinite(previous) ? previous : null,
+      change,
+      percent_change: percentChange,
+      day_open: Number.isFinite(Number(meta.regularMarketPrice)) && latest?.open != null ? Number(latest.open) : (latest?.open ?? null),
+      day_high: Number.isFinite(Number(meta.regularMarketDayHigh)) ? Number(meta.regularMarketDayHigh) : (latest?.high ?? null),
+      day_low: Number.isFinite(Number(meta.regularMarketDayLow)) ? Number(meta.regularMarketDayLow) : (latest?.low ?? null),
+      volume: Number.isFinite(Number(meta.regularMarketVolume)) ? Number(meta.regularMarketVolume) : (latest?.volume ?? null),
+      as_of: meta.regularMarketTime || latest?.time || null,
+      price_source: "Yahoo Finance live market quote",
+      ohlc_source: "Yahoo Finance live market quote"
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchEquityPanditQuote(symbol) {
   const clean = String(symbol || "").trim().toLowerCase().replace(/\.ns$/i, "");
   if (!clean) return null;
@@ -817,8 +874,22 @@ export default {
         }
       } catch (_) {}
 
-      // NSE historical data remains the primary source for the displayed latest
-      // price/OHLC because Yahoo can occasionally expose a stale ETF candle.
+      // Use Yahoo's live intraday market quote as the displayed current price.
+      // EquityPandit is kept only as a fallback when the live quote is unavailable.
+      const live = await fetchYahooLiveQuote(yahooSymbol);
+      if (live) {
+        return json({
+          symbol,
+          yahoo_symbol: yahooSymbol,
+          exchange: "NSE",
+          currency: "INR",
+          ...live,
+          year_high: yahooData?.meta?.fiftyTwoWeekHigh ?? null,
+          year_low: yahooData?.meta?.fiftyTwoWeekLow ?? null,
+          history: yahooData?.history || []
+        });
+      }
+
       const ep = await fetchEquityPanditQuote(symbol);
       if (ep) {
         return json({
