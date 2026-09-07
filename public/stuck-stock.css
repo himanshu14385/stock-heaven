@@ -73,6 +73,26 @@
     transform: translateY(-1px);
 }
 
+.stuck-drag-handle {
+    width: 22px;
+    min-width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9aa8bf;
+    cursor: grab;
+    font-size: 14px;
+    touch-action: none;
+}
+
+.stuck-drag-handle:hover {
+    color: #416ee8;
+}
+
+.stuck-drag-handle:active {
+    cursor: grabbing;
+}
+
 .stuck-stock-name {
     color: #27334a;
     font-size: 13px;

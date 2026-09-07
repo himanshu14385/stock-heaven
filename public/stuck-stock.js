@@ -143,7 +143,8 @@ async function loadStuckStocks() {
     );
 
     container.innerHTML = results.map((stock, index) => `
-        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}">
+        <div class="stuck-stock-row" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}">
+            <div class="stuck-drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
             <div class="ssname-wrap">
                 <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
                 <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
@@ -256,18 +257,29 @@ let stuckReorderSaving = false;
 function bindStuckDragDrop() {
     const container = document.getElementById("stuckStockList");
     if (!container) return;
-    const cards = container.querySelectorAll(".stuck-stock-row[draggable='true']");
-    cards.forEach(card => {
-        card.addEventListener("dragstart", event => {
+    const handles = container.querySelectorAll(".stuck-drag-handle[draggable='true']");
+    const cards = container.querySelectorAll(".stuck-stock-row");
+
+    handles.forEach(handle => {
+        handle.addEventListener("dragstart", event => {
             if (!window.requireAdmin() || editingStuckIndex !== null || stuckReorderSaving) {
                 event.preventDefault();
                 return;
             }
+            const card = handle.closest(".stuck-stock-row");
+            if (!card) return;
             draggedStuckIndex = Number(card.dataset.stuckIndex);
             card.classList.add("stuck-dragging");
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData("text/plain", String(draggedStuckIndex));
         });
+        handle.addEventListener("dragend", () => {
+            draggedStuckIndex = null;
+            cards.forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
+        });
+    });
+
+    cards.forEach(card => {
         card.addEventListener("dragover", event => {
             if (draggedStuckIndex === null) return;
             event.preventDefault();
@@ -283,10 +295,6 @@ function bindStuckDragDrop() {
             draggedStuckIndex = null;
             if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) return;
             await reorderStuckByDrag(from, to);
-        });
-        card.addEventListener("dragend", () => {
-            draggedStuckIndex = null;
-            cards.forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
         });
     });
 }
