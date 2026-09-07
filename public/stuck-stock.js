@@ -143,7 +143,7 @@ async function loadStuckStocks() {
     );
 
     container.innerHTML = results.map((stock, index) => `
-        <div class="stuck-stock-row">
+        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}">
             <div class="ssname-wrap">
                 <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
                 <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
@@ -151,10 +151,6 @@ async function loadStuckStocks() {
             <div class="stuck-row-right">
                 ${editingStuckIndex !== index
                     ? `<div class="stuck-actions" onclick="event.stopPropagation()">
-                        <button class="stuck-action stuck-reorder" onclick="moveStuck(${index}, 'up')" title="Move Up"><i class="fa-solid fa-chevron-up"></i></button>
-                        <button class="stuck-action stuck-reorder" onclick="moveStuck(${index}, 'down')" title="Move Down"><i class="fa-solid fa-chevron-down"></i></button>
-                        <button class="stuck-action stuck-reorder" onclick="moveStuck(${index}, 'left')" title="Move Left"><i class="fa-solid fa-chevron-left"></i></button>
-                        <button class="stuck-action stuck-reorder" onclick="moveStuck(${index}, 'right')" title="Move Right"><i class="fa-solid fa-chevron-right"></i></button>
                         <button class="stuck-action stuck-edit" onclick="editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
                         <button class="stuck-action stuck-delete" onclick="deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
                        </div>`
@@ -172,6 +168,8 @@ async function loadStuckStocks() {
             </div>
         </div>
     `).join("");
+
+    bindStuckDragDrop();
 
     if (updated) {
         updated.textContent = "Prices fetched: " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
@@ -252,41 +250,73 @@ async function addStuckStock() {
 
 document.addEventListener("keydown", handleAddStuckKey);
 
-async function moveStuck(index, direction) {
-    if (!window.requireAdmin()) return;
-    if (editingStuckIndex !== null) return;
-    const count = stuckStocks.length;
-    if (index < 0 || index >= count) return;
+let draggedStuckIndex = null;
+let stuckReorderSaving = false;
 
-    let target = index;
-    if (direction === 'up') target = index - 2;
-    if (direction === 'down') target = index + 2;
-    if (direction === 'left') target = index - 1;
-    if (direction === 'right') target = index + 1;
-    if (target < 0 || target >= count || target === index) return;
+function bindStuckDragDrop() {
+    const container = document.getElementById("stuckStockList");
+    if (!container) return;
+    const cards = container.querySelectorAll(".stuck-stock-row[draggable='true']");
+    cards.forEach(card => {
+        card.addEventListener("dragstart", event => {
+            if (!window.requireAdmin() || editingStuckIndex !== null || stuckReorderSaving) {
+                event.preventDefault();
+                return;
+            }
+            draggedStuckIndex = Number(card.dataset.stuckIndex);
+            card.classList.add("stuck-dragging");
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(draggedStuckIndex));
+        });
+        card.addEventListener("dragover", event => {
+            if (draggedStuckIndex === null) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            card.classList.add("stuck-drag-over");
+        });
+        card.addEventListener("dragleave", () => card.classList.remove("stuck-drag-over"));
+        card.addEventListener("drop", async event => {
+            event.preventDefault();
+            card.classList.remove("stuck-drag-over");
+            const from = draggedStuckIndex;
+            const to = Number(card.dataset.stuckIndex);
+            draggedStuckIndex = null;
+            if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) return;
+            await reorderStuckByDrag(from, to);
+        });
+        card.addEventListener("dragend", () => {
+            draggedStuckIndex = null;
+            cards.forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
+        });
+    });
+}
 
-    // Swap in the same row-major order used by the 2-column grid.
-    const temp = stuckStocks[index];
-    stuckStocks[index] = stuckStocks[target];
-    stuckStocks[target] = temp;
+async function reorderStuckByDrag(from, to) {
+    if (!window.requireAdmin() || stuckReorderSaving) return;
+    if (from < 0 || from >= stuckStocks.length || to < 0 || to >= stuckStocks.length) return;
 
+    const next = [...stuckStocks];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    stuckReorderSaving = true;
     try {
         const response = await fetch('/api/data/stuck', {
             method: 'PATCH',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             cache: 'no-store',
-            body: JSON.stringify({ order: stuckStocks.map(stock => stock.id) })
+            body: JSON.stringify({ order: next.map(stock => stock.id) })
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.error) throw new Error(data.error || 'Reorder failed');
-        stuckStocks = Array.isArray(data.items) ? data.items : stuckStocks;
+        stuckStocks = Array.isArray(data.items) ? data.items : next;
         await loadStuckStocks();
     } catch (error) {
-        // Reload from D1 so a failed reorder never leaves the UI out of sync.
         await loadStuckData();
         await loadStuckStocks();
         alert(error.message || 'Reorder failed');
+    } finally {
+        stuckReorderSaving = false;
     }
 }
 

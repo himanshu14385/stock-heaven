@@ -178,13 +178,13 @@
     transition: background .18s ease, color .18s ease;
 }
 
-.stuck-reorder {
-    color: #7186b8;
+
+.stuck-stock-row.stuck-dragging {
+    opacity: .55;
 }
 
-.stuck-reorder:hover {
-    background: #eef3ff;
-    color: #416ee8;
+.stuck-stock-row.stuck-drag-over {
+    border-color: #b8c9f7;
 }
 
 .stuck-edit {
