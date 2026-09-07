@@ -206,6 +206,88 @@ async function loadStuckStocks() {
     }
 }
 
+function openAddStuckStock() {
+    if (!window.requireAdmin()) return;
+    const modal = document.getElementById("stuckAddModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    const form = document.getElementById("stuckAddForm");
+    if (form) form.reset();
+    const status = document.getElementById("stuckAddStatus");
+    if (status) status.textContent = "";
+    setTimeout(() => document.getElementById("stuckAddName")?.focus(), 50);
+}
+
+function closeAddStuckStock(event) {
+    if (event && event.target !== event.currentTarget) return;
+    const modal = document.getElementById("stuckAddModal");
+    if (!modal) return;
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+}
+
+function handleAddStuckKey(event) {
+    if (event.key === "Escape") closeAddStuckStock();
+}
+
+async function addStuckStock() {
+    if (!window.requireAdmin()) return;
+
+    const nameInput = document.getElementById("stuckAddName");
+    const symbolInput = document.getElementById("stuckAddSymbol");
+    const qtyInput = document.getElementById("stuckAddQty");
+    const buyInput = document.getElementById("stuckAddBuyPrice");
+    const status = document.getElementById("stuckAddStatus");
+    const saveBtn = document.getElementById("stuckAddSave");
+
+    const name = nameInput?.value.trim() || "";
+    const symbol = cleanSymbol(symbolInput?.value || "");
+    const quantity = Number(qtyInput?.value);
+    const buyPrice = Number(buyInput?.value);
+
+    if (!name) { alert("Stock name enter kijiye"); nameInput?.focus(); return; }
+    if (!symbol) { alert("Stock symbol enter kijiye"); symbolInput?.focus(); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { alert("Valid quantity enter kijiye"); qtyInput?.focus(); return; }
+    if (!Number.isFinite(buyPrice) || buyPrice <= 0) { alert("Valid buy price enter kijiye"); buyInput?.focus(); return; }
+
+    if (status) { status.className = "stuck-add-status loading"; status.textContent = "Live price verify ho raha hai..."; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding...'; }
+
+    try {
+        // Validate the symbol against the same live stock API used by the list.
+        const quoteResponse = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`, { cache: "no-store" });
+        const quote = await quoteResponse.json().catch(() => ({}));
+        if (!quoteResponse.ok || quote.error || !Number.isFinite(Number(quote.price))) {
+            throw new Error("Stock symbol se live price nahi mila. Symbol check kijiye.");
+        }
+
+        stuckStocks.push({
+            symbol,
+            name,
+            stuckInfo: `${quantity} × ${buyPrice.toFixed(2)}`
+        });
+
+        await saveStuckStockSettings();
+        closeAddStuckStock();
+        await loadStuckStocks();
+
+        // Keep the newly added stock visible/selected with its live price.
+        showStuckQuote(symbol);
+    } catch (error) {
+        // If saving failed, do not leave an unsaved item in the local array.
+        const last = stuckStocks[stuckStocks.length - 1];
+        if (last && last.symbol === symbol && last.name === name && last.stuckInfo === `${quantity} × ${buyPrice.toFixed(2)}`) {
+            stuckStocks.pop();
+        }
+        if (status) { status.className = "stuck-add-status error"; status.textContent = error.message || "Stock add nahi hua."; }
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Stock'; }
+    }
+}
+
+document.addEventListener("keydown", handleAddStuckKey);
+
 function editStuck(index) {
     if (!window.requireAdmin()) return;
     editingStuckIndex = index;

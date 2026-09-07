@@ -7,7 +7,7 @@
     <title>Stuck Stock • Stock Heaven</title>
 
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="stuck-stock.css">
+    <link rel="stylesheet" href="stuck-stock.css?v=20260907-add1">
 
     <link
         rel="stylesheet"
@@ -238,9 +238,14 @@
                 </div>
                 <p class="stuck-description">Stocks and ETFs you are currently tracking.</p>
             </div>
-            <button class="stuck-refresh" onclick="loadStuckStocks()" title="Refresh prices">
-                <i class="fa-solid fa-rotate"></i> Refresh
-            </button>
+            <div class="stuck-heading-actions">
+                <button class="stuck-add-btn" onclick="openAddStuckStock()" title="Add stock to Stuck Stock">
+                    <i class="fa-solid fa-plus"></i> Add Stock
+                </button>
+                <button class="stuck-refresh" onclick="loadStuckStocks()" title="Refresh prices">
+                    <i class="fa-solid fa-rotate"></i> Refresh
+                </button>
+            </div>
         </div>
         <div id="stuckStockList" class="stuck-stock-list">
             <div class="stuck-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading prices...</div>
@@ -248,6 +253,46 @@
         <div id="stuckUpdated" class="stuck-updated">Updating prices...</div>
     </section>
 </main>
+
+<!-- ADD STOCK MODAL -->
+<div id="stuckAddModal" class="stuck-add-modal" aria-hidden="true" onclick="closeAddStuckStock(event)">
+    <div class="stuck-add-dialog" role="dialog" aria-modal="true" aria-labelledby="stuckAddTitle" onclick="event.stopPropagation()">
+        <div class="stuck-add-head">
+            <div>
+                <div class="stuck-add-title" id="stuckAddTitle"><i class="fa-solid fa-thumbtack"></i> Add Stock</div>
+                <p>Add stock to your Stuck Stock database.</p>
+            </div>
+            <button class="stuck-add-close" type="button" onclick="closeAddStuckStock()" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <form id="stuckAddForm" onsubmit="event.preventDefault(); addStuckStock();">
+            <div class="stuck-add-grid">
+                <label class="stuck-add-field stuck-add-wide">
+                    <span>Stock Name</span>
+                    <input id="stuckAddName" type="text" placeholder="e.g. Reliance Industries Limited" autocomplete="off">
+                </label>
+                <label class="stuck-add-field">
+                    <span>Stock Symbol</span>
+                    <input id="stuckAddSymbol" type="text" placeholder="e.g. RELIANCE" autocomplete="off">
+                </label>
+                <label class="stuck-add-field">
+                    <span>Quantity</span>
+                    <input id="stuckAddQty" type="number" min="0.01" step="0.01" placeholder="e.g. 100">
+                </label>
+                <label class="stuck-add-field">
+                    <span>Buy Price</span>
+                    <input id="stuckAddBuyPrice" type="number" min="0.01" step="0.01" placeholder="e.g. 1250.50">
+                </label>
+            </div>
+            <div class="stuck-add-note"><i class="fa-solid fa-circle-info"></i> Current price live API se fetch hoga. Niche red value aapki manually entered quantity × buy price rahegi.</div>
+            <div id="stuckAddStatus" class="stuck-add-status"></div>
+            <div class="stuck-add-footer">
+                <button class="stuck-add-cancel" type="button" onclick="closeAddStuckStock()">Cancel</button>
+                <button id="stuckAddSave" class="stuck-add-save" type="submit"><i class="fa-solid fa-plus"></i> Add Stock</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <footer><p>Stock Heaven • Stuck Stock watchlist</p></footer>
 
