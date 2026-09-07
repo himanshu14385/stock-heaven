@@ -1,4 +1,5 @@
 let stuckStocks = [];
+let stuckPrices = {};
 let editingStuckIndex = null;
 
 async function loadStuckData(){
@@ -126,24 +127,18 @@ async function getStuckStockPrice(symbol) {
     }
 }
 
-async function loadStuckStocks() {
+function renderStuckStocks() {
     const container = document.getElementById("stuckStockList");
     const updated = document.getElementById("stuckUpdated");
     if (!container) return;
 
-    container.innerHTML = `<div class="stuck-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading prices...</div>`;
-
-    const results = await Promise.all(
-        stuckStocks.slice(0, 20).map(async stock => ({
-            symbol: stock.symbol,
-            name: stock.name,
-            stuckInfo: stock.stuckInfo,
-            price: await getStuckStockPrice(stock.symbol)
-        }))
-    );
-
-    container.innerHTML = results.map((stock, index) => `
-        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}" ondragstart="dragStuck(event, '${escapeStuckHtml(stock.id ?? '')}')" ondragover="allowStuckDrop(event)" ondrop="dropStuck(event, '${escapeStuckHtml(stock.id ?? '')}')">
+    const visibleStocks = stuckStocks.slice(0, 20);
+    container.innerHTML = visibleStocks.map((stock, index) => {
+        const price = stuckPrices[String(stock.id ?? stock.symbol)] ?? null;
+        return `
+        <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}"
+             onclick="showStuckQuote('${String(stock.symbol || '').replace(/'/g, "\\'")}')"
+             ondragstart="dragStuck(event, ${index})" ondragover="allowStuckDrop(event)" ondrop="dropStuck(event, ${index})">
             <div class="stuck-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
             <div class="ssname-wrap">
                 <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
@@ -152,29 +147,47 @@ async function loadStuckStocks() {
             <div class="stuck-row-right">
                 ${editingStuckIndex !== index
                     ? `<div class="stuck-actions" onclick="event.stopPropagation()">
-                        <button class="stuck-action stuck-edit" onclick="editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
-                        <button class="stuck-action stuck-delete" onclick="deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                        <button class="stuck-action stuck-edit" onclick="event.stopPropagation();editStuck(${index})" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="stuck-action stuck-delete" onclick="event.stopPropagation();deleteStuck(${index})" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
                        </div>`
                     : ``}
                 <div class="ssname-wrap">
-                    <span class="stuck-stock-price">${formatStuckPrice(stock.price)}</span>
+                    <span class="stuck-stock-price">${formatStuckPrice(price)}</span>
                     ${editingStuckIndex === index
                         ? `<div class="stuck-edit-wrap" onclick="event.stopPropagation()">
                             <input class="stuck-info-input" id="stuckInfoInput${index}" type="text" value="${escapeStuckHtml(stock.stuckInfo)}" aria-label="Edit stuck stock quantity and price" onkeydown="handleStuckEditKey(event, ${index})">
-                            <button class="stuck-action stuck-save" onclick="saveStuckEdit(${index})" title="Save"><i class="fa-solid fa-check"></i></button>
-                            <button class="stuck-action stuck-cancel" onclick="cancelStuckEdit(event)" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                            <button class="stuck-action stuck-save" onclick="event.stopPropagation();saveStuckEdit(${index})" title="Save"><i class="fa-solid fa-check"></i></button>
+                            <button class="stuck-action stuck-cancel" onclick="event.stopPropagation();cancelStuckEdit(event)" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
                           </div>`
                         : `<span class="mystuckprice">${escapeStuckHtml(stock.stuckInfo)}</span>`}
                 </div>
             </div>
-        </div>
-    `).join("");
-
-    bindStuckDragDrop();
+        </div>`;
+    }).join("");
 
     if (updated) {
         updated.textContent = "Prices fetched: " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
     }
+}
+
+async function loadStuckStocks() {
+    const container = document.getElementById("stuckStockList");
+    if (!container) return;
+
+    container.innerHTML = `<div class="stuck-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading prices...</div>`;
+
+    const results = await Promise.all(
+        stuckStocks.slice(0, 20).map(async stock => {
+            const price = await getStuckStockPrice(stock.symbol);
+            return { id: stock.id, symbol: stock.symbol, price };
+        })
+    );
+
+    results.forEach(item => {
+        stuckPrices[String(item.id ?? item.symbol)] = item.price;
+    });
+
+    renderStuckStocks();
 }
 
 function openAddStuckStock() {
@@ -251,77 +264,69 @@ async function addStuckStock() {
 
 document.addEventListener("keydown", handleAddStuckKey);
 
-let draggedStuckId = null;
+let draggedStuckIndex = null;
 let stuckReorderSaving = false;
 
-// Same interaction model as Favourite Stocks: the complete row is draggable,
-// the grip on the left is the visual drag handle. Reordering changes the DOM
-// immediately and never reloads/fetches prices.
-function dragStuck(event, id) {
+// Deliberately follows the Favourite Stock reorder pattern:
+// full row is draggable, the left grip is visual only, the array is moved
+// on drop, then the saved order is rendered without refetching prices.
+function dragStuck(event, index) {
     if (!window.requireAdmin() || editingStuckIndex !== null || stuckReorderSaving) {
         event.preventDefault();
         return;
     }
-    draggedStuckId = String(id || "");
+    draggedStuckIndex = Number(index);
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", draggedStuckId);
+    event.dataTransfer.setData("text/plain", String(index));
     event.currentTarget.classList.add("stuck-dragging");
 }
 
 function allowStuckDrop(event) {
-    if (!draggedStuckId) return;
+    if (draggedStuckIndex === null) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    document.querySelectorAll("#stuckStockList .stuck-stock-row").forEach(c => c.classList.remove("stuck-drag-over"));
-    const target = event.currentTarget;
-    if (target && String(target.dataset.stuckId || "") !== draggedStuckId) {
-        target.classList.add("stuck-drag-over");
-    }
 }
 
-async function dropStuck(event, targetId) {
+function dropStuck(event, targetIndex) {
     if (!window.requireAdmin()) return;
     event.preventDefault();
     event.stopPropagation();
 
-    const container = document.getElementById("stuckStockList");
-    if (!container) return;
+    if (draggedStuckIndex === null) return;
 
-    const fromId = draggedStuckId || event.dataTransfer.getData("text/plain");
-    draggedStuckId = null;
-    document.querySelectorAll("#stuckStockList .stuck-stock-row").forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
-    if (!fromId || String(fromId) === String(targetId)) return;
+    const from = Number(draggedStuckIndex);
+    const target = Number(targetIndex);
+    draggedStuckIndex = null;
 
-    const fromCard = Array.from(container.querySelectorAll(".stuck-stock-row"))
-        .find(c => String(c.dataset.stuckId || "") === String(fromId));
-    const targetCard = Array.from(container.querySelectorAll(".stuck-stock-row"))
-        .find(c => String(c.dataset.stuckId || "") === String(targetId));
-    if (!fromCard || !targetCard || fromCard === targetCard) return;
-
-    // Move the real existing DOM node immediately. No render(), no API price
-    // calls, so the displayed live price stays attached to its stock.
-    const rect = targetCard.getBoundingClientRect();
-    const before = event.clientY < rect.top + rect.height / 2;
-    if (before) container.insertBefore(fromCard, targetCard);
-    else container.insertBefore(fromCard, targetCard.nextSibling);
-
-    const orderedIds = Array.from(container.querySelectorAll(".stuck-stock-row"))
-        .map(c => String(c.dataset.stuckId || ""))
-        .filter(Boolean);
-
-    const byId = new Map(stuckStocks.map(stock => [String(stock.id ?? ""), stock]));
-    stuckStocks = orderedIds.map(id => byId.get(id)).filter(Boolean);
-    Array.from(container.querySelectorAll(".stuck-stock-row")).forEach((c, i) => {
-        c.dataset.stuckIndex = String(i);
+    document.querySelectorAll("#stuckStockList .stuck-stock-row").forEach(row => {
+        row.classList.remove("stuck-dragging", "stuck-drag-over");
     });
 
-    // Persist only the order. Do not reload the list after saving.
-    persistStuckOrder(orderedIds);
+    if (!Number.isInteger(from) || !Number.isInteger(target) || from === target) return;
+    if (!stuckStocks[from] || !stuckStocks[target]) return;
+
+    const [item] = stuckStocks.splice(from, 1);
+    const insertAt = from < target ? target - 1 : target;
+    stuckStocks.splice(insertAt, 0, item);
+
+    // Instant UI update. renderStuckStocks() only uses cached prices, so
+    // there is no loading spinner and no price API call during reorder.
+    renderStuckStocks();
+
+    const orderedIds = stuckStocks
+        .map(stock => Number(stock.id))
+        .filter(Number.isInteger);
+
+    if (orderedIds.length === stuckStocks.length) {
+        persistStuckOrder(orderedIds);
+    }
 }
 
 document.addEventListener("dragend", () => {
-    document.querySelectorAll("#stuckStockList .stuck-stock-row").forEach(c => c.classList.remove("stuck-dragging", "stuck-drag-over"));
-    draggedStuckId = null;
+    document.querySelectorAll("#stuckStockList .stuck-stock-row").forEach(row => {
+        row.classList.remove("stuck-dragging", "stuck-drag-over");
+    });
+    draggedStuckIndex = null;
 });
 
 async function persistStuckOrder(order) {
@@ -337,14 +342,20 @@ async function persistStuckOrder(order) {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.error) throw new Error(data.error || 'Reorder failed');
-        // Intentionally no loadStuckStocks()/render(): the DOM is already in
-        // the final order and its current prices must remain untouched.
+
         if (Array.isArray(data.items) && data.items.length === stuckStocks.length) {
             const serverById = new Map(data.items.map(item => [String(item.id), item]));
             stuckStocks = order.map(id => serverById.get(String(id))).filter(Boolean);
+            renderStuckStocks();
         }
     } catch (error) {
         console.error('Stuck Stock reorder save failed:', error);
+        // Restore the authoritative D1 order only if the save actually failed.
+        try {
+            await loadStuckData();
+            renderStuckStocks();
+        } catch (_) {}
+        alert(error.message || 'Reorder failed');
     } finally {
         stuckReorderSaving = false;
     }
