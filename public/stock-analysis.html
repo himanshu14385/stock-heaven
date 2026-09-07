@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Analysis • Stock Heaven</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="stock-analysis.css?v=20260907-1800">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="auth.css">
+  <script src="auth.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="top-header">
+    <div class="brand">
+      <div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div>
+      <div><h1>Stock Heaven</h1><p>Smart Stock Analysis</p></div>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <div class="nav-inner">
+      <a href="index.html#dashboard" class="nav-item"><i class="fa-solid fa-house"></i><span>Dashboard</span></a>
+      <a href="stuck-stock.html" class="nav-item"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></a>
+      <a href="summary.html" class="nav-item"><i class="fa-solid fa-layer-group"></i><span>Summary</span></a>
+      <a href="alert.html" class="nav-item"><i class="fa-solid fa-bell"></i><span>Alert</span></a>
+      <a href="fav-stock.html" class="nav-item"><i class="fa-solid fa-star"></i><span>Fav Stock</span></a>
+      <a href="movement-catch.html" class="nav-item"><i class="fa-solid fa-bolt"></i><span>Catch</span></a>
+      <a href="crypto.html" class="nav-item"><i class="fa-brands fa-bitcoin"></i><span>Crypto</span></a>
+      <a href="stock-analysis.html" class="nav-item active"><i class="fa-solid fa-magnifying-glass-chart"></i><span>Analysis</span></a>
+    </div>
+  </nav>
+
+  <main class="analysis-main">
+    <section class="analysis-head">
+      <div class="analysis-title">
+        <div class="analysis-title-icon"><i class="fa-solid fa-chart-column"></i></div>
+        <div>
+          <h2>Stock Analysis</h2>
+          <p>Search and add stocks to get Buy/Sell zones and technical analysis.</p>
+        </div>
+      </div>
+      <div class="head-actions">
+        <button id="clearAllBtn" class="btn btn-danger-soft"><i class="fa-solid fa-trash"></i> Clear All</button>
+        <button id="exportBtn" class="btn btn-blue-soft"><i class="fa-solid fa-download"></i> Export</button>
+      </div>
+    </section>
+
+    <section class="analysis-toolbar">
+      <div class="search-add-wrap">
+        <div class="analysis-search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="stockSearch" autocomplete="off" placeholder="Search and add stocks (e.g. Tata Motors, Reliance, HDFC Bank...)">
+          <div id="stockSuggestions" class="analysis-suggestions"></div>
+        </div>
+        <button id="addBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Add</button>
+        <button id="addMultipleBtn" class="btn btn-outline"><i class="fa-solid fa-plus"></i> Add Multiple</button>
+      </div>
+      <div id="statusText" class="analysis-status"></div>
+    </section>
+
+    <section class="analysis-summary">
+      <div class="summary-box"><strong id="countAll">0</strong><span>Stocks</span></div>
+      <div class="summary-box buy"><strong id="countBuy">0</strong><span>Buy Zone</span></div>
+      <div class="summary-box hold"><strong id="countHold">0</strong><span>Hold Zone</span></div>
+      <div class="summary-box sell"><strong id="countSell">0</strong><span>Sell Zone</span></div>
+      <div class="summary-box strong"><strong id="countStrong">0</strong><span>Strong Buy</span></div>
+    </section>
+
+    <section class="analysis-table-card">
+      <div class="analysis-table-scroll">
+        <table class="analysis-table">
+          <thead>
+            <tr>
+              <th class="col-num">#</th>
+              <th class="col-stock">Stock</th>
+              <th class="col-price">Price<div>Change</div></th>
+              <th class="col-zone">Buy / Sell Zone<div>Fair Value</div></th>
+              <th class="col-zonebar">Valuation Position</th>
+              <th class="col-view">Current View</th>
+              <th class="col-tech">Technical Analysis<div>RSI · MACD · Trend · Moving Averages · BB · VWAP · Volume</div></th>
+              <th class="col-action">Action</th>
+            </tr>
+          </thead>
+          <tbody id="analysisRows"></tbody>
+        </table>
+        <div id="emptyState" class="analysis-empty">
+          <div class="empty-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+          <h3>No stocks added yet</h3>
+          <p>Search a stock above and click <b>Add</b>. You can analyse up to 15 stocks on this page.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="analysis-footer">
+      <span>Valuation uses available PE/peer data; technicals are calculated from market history. For educational purposes only.</span>
+      <span>Last updated: <b id="lastUpdated">—</b> <button id="refreshBtn" class="refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button></span>
+    </div>
+  </main>
+</div>
+
+<div id="multiModal" class="analysis-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close-modal></div>
+  <div class="modal-box">
+    <div class="modal-head"><div><h3>Add Multiple Stocks</h3><p>Enter symbols separated by comma or space.</p></div><button class="modal-close" data-close-modal><i class="fa-solid fa-xmark"></i></button></div>
+    <textarea id="multiInput" rows="5" placeholder="TATAMOTORS, RELIANCE, HDFCBANK, INFY"></textarea>
+    <div class="modal-note">Maximum 15 stocks total.</div>
+    <div class="modal-actions"><button class="btn btn-outline" data-close-modal>Cancel</button><button id="multiAddConfirm" class="btn btn-primary">Add Stocks</button></div>
+  </div>
+</div>
+
+<script src="stock-analysis.js?v=20260907-1800"></script>
+</body>
+</html>
