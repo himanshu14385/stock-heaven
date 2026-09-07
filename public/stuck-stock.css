@@ -573,20 +573,9 @@
     color: #8490a4;
     font-size: 11px;
 }
-
-.ssname-wrap {
-    display: flex;
-    flex-direction: column;
-    text-align: right;
-    row-gap: 5px;
-}
-
-span.mystuckprice {
-    font-size: 13px;
-    color: #F44336;
-    font-weight: 600;
-}
-
-.dnone {
-    display: none !important;
-}
+/* Smooth favourite-style drag reorder */
+.stuck-stock-row[draggable="true"]{cursor:default}
+.stuck-stock-row.stuck-dragging{opacity:.5}
+.stuck-stock-row.stuck-drag-over{outline:2px dashed rgba(65,110,232,.28);outline-offset:-2px}
+.stuck-drag-handle{cursor:grab}
+.stuck-drag-handle:active{cursor:grabbing}
