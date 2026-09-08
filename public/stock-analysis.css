@@ -26,6 +26,7 @@
 .col-num{width:38px}.col-stock{width:190px}.col-price{width:118px}
 .col-sma{width:95px;text-align:center!important}.col-indicator{width:88px;text-align:center!important}
 .col-confirmation{width:150px;text-align:center!important}.col-score{width:100px;text-align:center!important}.col-action{width:52px}
+.analysis-table td:nth-child(n+4):nth-child(-n+11){text-align:center}
 .tech-grid{display:contents}
 .tech-item{min-width:0;text-align:center}
 .tech-label{font-size:11px;color:#66809f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -47,7 +48,7 @@
 /* Buy Zone v7: stable table structure + reorder handle */
 .analysis-main{max-width:none!important;margin:0!important}
 .analysis-control-container{max-width:1500px}
-.analysis-table-card.container-fluid{max-width:none!important;box-sizing:border-box}
+.analysis-table-card.container-fluid{width:calc(100% - 24px)!important;max-width:none!important;margin:0 12px!important;box-sizing:border-box}
 .analysis-table-scroll{width:100%;overflow-x:auto}
 .analysis-table{width:100%;min-width:1540px!important;table-layout:fixed}
 .analysis-table th,.analysis-table td{box-sizing:border-box}
@@ -69,4 +70,32 @@
 .analysis-table tbody tr.drag-over{background:#f2f7ff;box-shadow:inset 0 2px 0 #1769ff,inset 0 -2px 0 #1769ff}
 .loading-cell{padding:10px 0;color:#71839b}
 .confirmation-main{font-size:16px!important}.support-line{font-size:10px!important}.buy-line{font-size:11px!important}
+.analysis-footer{width:calc(100% - 24px)!important;margin:5px 12px!important}
 @media(max-width:700px){.analysis-table-card.container-fluid{width:calc(100% - 16px)!important;margin:0 8px!important}.analysis-table{min-width:1540px!important}}
+
+
+/* Buy Zone v8 — clear valuation colours, row tinting and column guide */
+.table-card-topbar{height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 14px;background:#fff;border-bottom:1px solid #e6edf6}
+.table-zone-legend{display:flex;align-items:center;gap:5px;color:#71839b;font-size:10px;font-weight:700}
+.legend-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-left:9px}
+.legend-dot:first-child{margin-left:0}.legend-strong{background:#7c3aed}.legend-buy{background:#0a9b67}.legend-hold{background:#d99100}.legend-sell{background:#e53945}
+.table-info-btn{width:28px;height:28px;border:1px solid #cddbef;border-radius:50%;background:#f7faff;color:#1769ff;display:grid;place-items:center;cursor:pointer;font-size:12px;font-weight:900}
+.table-info-btn:hover{background:#eaf2ff;border-color:#a9c5f5}
+/* Zone colours are intentionally distinct: purple=strong buy, green=buy, amber=hold, red=sell. */
+.summary-box.strong{background:#f5f0ff;border-color:#ddd0ff}.summary-box.strong strong{color:#7c3aed}
+.summary-box.buy{background:#effbf6;border-color:#c9eddb}.summary-box.buy strong{color:#0a9b67}
+.summary-box.hold{background:#fff8e9;border-color:#f2dfac}.summary-box.hold strong{color:#d28700}
+.summary-box.sell{background:#fff1f2;border-color:#f2c8cc}.summary-box.sell strong{color:#e53945}
+.zone-strong{background:#7c3aed!important;color:#fff!important}.zone-buy{background:#0a9b67!important;color:#fff!important}.zone-hold{background:#d99100!important;color:#fff!important}.zone-sell{background:#e53945!important;color:#fff!important}
+/* Same zone colour family is carried into the complete row as a subtle tint. */
+.analysis-table tbody tr.zone-row.strong{background:#fbf8ff}.analysis-table tbody tr.zone-row.buy{background:#f7fdfa}.analysis-table tbody tr.zone-row.hold{background:#fffdf6}.analysis-table tbody tr.zone-row.sell{background:#fff9f9}
+.analysis-table tbody tr.zone-row.strong:hover{background:#f5efff}.analysis-table tbody tr.zone-row.buy:hover{background:#eefaf5}.analysis-table tbody tr.zone-row.hold:hover{background:#fff8e9}.analysis-table tbody tr.zone-row.sell:hover{background:#fff0f1}
+.analysis-table tbody tr.zone-row.strong td:first-child{box-shadow:inset 3px 0 #7c3aed}.analysis-table tbody tr.zone-row.buy td:first-child{box-shadow:inset 3px 0 #0a9b67}.analysis-table tbody tr.zone-row.hold td:first-child{box-shadow:inset 3px 0 #d99100}.analysis-table tbody tr.zone-row.sell td:first-child{box-shadow:inset 3px 0 #e53945}
+/* Do not let the zone tint overpower the readable cell contents. */
+.analysis-table tbody tr.zone-row td{background:transparent}
+.table-info-modal{display:none;position:fixed;inset:0;z-index:1000}.table-info-modal.show{display:block}
+.table-info-backdrop{position:absolute;inset:0;background:rgba(15,31,55,.42)}
+.table-info-box{position:relative;width:min(920px,calc(100% - 30px));max-height:82vh;overflow:auto;margin:8vh auto 0;background:#fff;border:1px solid #d9e4f2;border-radius:14px;box-shadow:0 25px 70px rgba(15,37,70,.25);padding:18px}
+.table-info-head{display:flex;justify-content:space-between;gap:15px;align-items:flex-start}.table-info-head h3{margin:0;color:#17345f;font-size:18px}.table-info-head p{margin:4px 0 0;color:#7889a2;font-size:11px}.table-info-close{border:0;background:#f5f8fc;color:#6e8099;width:30px;height:30px;border-radius:7px;cursor:pointer}
+.table-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}.info-card{border:1px solid #e0e8f2;border-radius:9px;padding:10px 11px;background:#fbfdff}.info-card b{display:block;color:#173a67;font-size:12px;margin-bottom:4px}.info-card span{display:block;color:#657994;font-size:11px;line-height:1.45}.c-strong{color:#7c3aed}.c-buy{color:#0a9b67}.c-hold{color:#d28700}.c-sell{color:#e53945}.table-info-note{margin-top:12px;padding:10px 11px;border-radius:8px;background:#f3f7fd;color:#647793;font-size:10px;line-height:1.45}
+@media(max-width:700px){.table-zone-legend{display:none}.table-info-grid{grid-template-columns:1fr}.table-info-box{margin-top:4vh;max-height:88vh}.table-card-topbar{height:38px}}

@@ -56,10 +56,16 @@
       </section>
     </section>
 
-  </main>
-</div>
-
     <section class="analysis-table-card container-fluid">
+      <div class="table-card-topbar">
+        <div class="table-zone-legend" aria-label="Zone legend">
+          <span class="legend-dot legend-strong"></span><span>Strong Buy</span>
+          <span class="legend-dot legend-buy"></span><span>Buy</span>
+          <span class="legend-dot legend-hold"></span><span>Hold</span>
+          <span class="legend-dot legend-sell"></span><span>Sell</span>
+        </div>
+        <button id="tableInfoBtn" class="table-info-btn" type="button" title="What does each column mean?" aria-label="Column information"><i class="fa-solid fa-info"></i></button>
+      </div>
       <div class="analysis-table-scroll">
         <table class="analysis-table">
           <thead>
@@ -96,6 +102,36 @@
       <span>Last updated: <b id="lastUpdated">—</b> <button id="refreshBtn" class="refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button></span>
     </div>
 
-<script src="stock-analysis.js?v=20260908-1500"></script>
+  </main>
+</div>
+
+<div id="tableInfoModal" class="table-info-modal" aria-hidden="true">
+  <div class="table-info-backdrop" data-close-info></div>
+  <div class="table-info-box" role="dialog" aria-modal="true" aria-labelledby="tableInfoTitle">
+    <div class="table-info-head">
+      <div><h3 id="tableInfoTitle">Buy Zone — Column Guide</h3><p>Simple language mein har column kya check karta hai.</p></div>
+      <button class="table-info-close" type="button" data-close-info aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="table-info-grid">
+      <div class="info-card"><b>Stock</b><span>Company ka naam aur NSE symbol.</span></div>
+      <div class="info-card"><b>Price</b><span>Abhi ka current market price aur aaj ka change.</span></div>
+      <div class="info-card"><b>SMA 20</b><span>Last 20 trading sessions ka average price. Price iske upar ho to short-term trend stronger maana jata hai.</span></div>
+      <div class="info-card"><b>SMA 50</b><span>Last 50 sessions ka average. Medium-term trend ka simple indicator.</span></div>
+      <div class="info-card"><b>SMA 200</b><span>Last 200 sessions ka average. Long-term trend ka broad picture deta hai.</span></div>
+      <div class="info-card"><b>RSI</b><span>Momentum 0–100 scale par. 30 ke neeche oversold, 70 ke upar overbought. Oversold alone buy confirmation nahi hai.</span></div>
+      <div class="info-card"><b>VWAP</b><span>Volume ko include karke average traded price. Price VWAP ke upar ho to buyers relatively stronger.</span></div>
+      <div class="info-card"><b>MACD</b><span>Momentum aur trend change check karta hai. Positive histogram bullish momentum, negative bearish momentum.</span></div>
+      <div class="info-card"><b>Bollinger</b><span>Price ki recent volatility/range. Lower band ke paas oversold pressure, upper band ke paas overbought pressure; middle band trend bias mein help karta hai.</span></div>
+      <div class="info-card"><b>Volume</b><span>Aaj ka volume recent average se compare hota hai. 1.5×+ strong participation, 0.8× se neeche weak participation.</span></div>
+      <div class="info-card"><b>Confirmation</b><span>8 bullish checks: Price vs SMA20/50/200, healthy RSI, MACD, VWAP, Bollinger middle aur volume. Example 6/8 = 8 mein se 6 checks supportive.</span></div>
+      <div class="info-card"><b>Technical Score</b><span>100-point technical score. SMA20/50/200 = 15-15-15, RSI = 10, MACD = 15, VWAP = 10, Bollinger = 10, Volume = 10. Missing data ko unfairly zero nahi kiya jata; available weights re-normalise hote hain.</span></div>
+      <div class="info-card"><b>Support / Buy Range</b><span>Recent swing lows aur ATR volatility se nearest meaningful support estimate hota hai. Buy range support ke around practical entry area hai; guarantee nahi.</span></div>
+      <div class="info-card"><b>Zone colours</b><span><strong class="c-strong">Strong Buy</strong> = price fair value se ≤80%; <strong class="c-buy">Buy</strong> = 80–95%; <strong class="c-hold">Hold</strong> = 95–110%; <strong class="c-sell">Sell</strong> = &gt;110%.</span></div>
+    </div>
+    <div class="table-info-note">Important: Valuation Zone aur Technical Confirmation alag cheezein hain. Cheap stock ko technical confirmation na mile to blindly buy signal nahi maana jana chahiye.</div>
+  </div>
+</div>
+
+<script src="stock-analysis.js?v=20260908-1600"></script>
 </body>
 </html>

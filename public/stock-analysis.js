@@ -95,33 +95,60 @@
   }
 
   function confirmationScore(t){
+    // 8 independent bullish checks. A point is earned only when that condition
+    // is actually supportive; missing data is not counted against the stock.
     const checks=[];
-    if(t.s20!=null&&t.price!=null)checks.push(t.price>t.s20);
-    if(t.s50!=null&&t.price!=null)checks.push(t.price>t.s50);
-    if(t.s200!=null&&t.price!=null)checks.push(t.price>t.s200);
-    if(t.rsi!=null)checks.push(t.rsi>=45&&t.rsi<=65);
-    if(t.macd!=null)checks.push(t.macd.hist>0);
-    if(t.vw!=null&&t.price!=null)checks.push(t.price>=t.vw);
-    if(t.bb!=null&&t.price!=null)checks.push(t.price>=t.bb.mid);
-    if(t.vr!=null)checks.push(t.vr>=1.2);
-    const available=checks.length, hits=checks.filter(Boolean).length;
-    return {hits,available,percent:available?Math.round(hits/available*100):0};
+    if(t.s20!=null&&t.price!=null)checks.push({key:'SMA 20',ok:t.price>t.s20});
+    if(t.s50!=null&&t.price!=null)checks.push({key:'SMA 50',ok:t.price>t.s50});
+    if(t.s200!=null&&t.price!=null)checks.push({key:'SMA 200',ok:t.price>t.s200});
+    if(t.rsi!=null)checks.push({key:'RSI',ok:t.rsi>=45&&t.rsi<=65});
+    if(t.macd!=null)checks.push({key:'MACD',ok:t.macd.hist>0});
+    if(t.vw!=null&&t.price!=null)checks.push({key:'VWAP',ok:t.price>=t.vw});
+    if(t.bb!=null&&t.price!=null)checks.push({key:'Bollinger',ok:t.price>=t.bb.mid});
+    if(t.vr!=null)checks.push({key:'Volume',ok:t.vr>=1.2});
+    const available=checks.length, hits=checks.filter(x=>x.ok).length;
+    return {hits,available,percent:available?Math.round(hits/available*100):0,checks};
   }
 
   function technicalScore(t){
+    // 100-point technical score. The weights are fixed so the score is
+    // comparable across stocks; unavailable indicators are excluded and the
+    // remaining weights are re-normalised.
     const parts=[];
-    if(t.s20!=null&&t.price!=null)parts.push([15,t.price>t.s20]);
-    if(t.s50!=null&&t.price!=null)parts.push([15,t.price>t.s50]);
-    if(t.s200!=null&&t.price!=null)parts.push([15,t.price>t.s200]);
-    if(t.rsi!=null)parts.push([10,t.rsi>=45&&t.rsi<=65]);
-    if(t.macd!=null)parts.push([15,t.macd.hist>0]);
-    if(t.vw!=null&&t.price!=null)parts.push([10,t.price>=t.vw]);
-    if(t.bb!=null&&t.price!=null)parts.push([10,t.price>=t.bb.mid]);
-    if(t.vr!=null)parts.push([10,t.vr>=1.2]);
+    const proximity=(price,avg)=>{
+      if(price==null||avg==null||avg===0)return null;
+      const pct=(price-avg)/avg;
+      if(pct>=0)return 1;
+      if(pct>=-0.01)return 0.5;
+      return 0;
+    };
+    const add=(weight,value)=>{if(value!=null)parts.push([weight,Math.max(0,Math.min(1,value))]);};
+    add(15,proximity(t.price,t.s20));
+    add(15,proximity(t.price,t.s50));
+    add(15,proximity(t.price,t.s200));
+    if(t.rsi!=null){
+      let v=0;
+      if(t.rsi>=50&&t.rsi<=65)v=1;
+      else if((t.rsi>=45&&t.rsi<50)||(t.rsi>65&&t.rsi<=70))v=.7;
+      else if((t.rsi>=35&&t.rsi<45)||(t.rsi>70&&t.rsi<=75))v=.4;
+      add(10,v);
+    }
+    if(t.macd!=null){
+      const h=n(t.macd.hist); const nearZero=-Math.abs(n(t.price)||1)*0.002; add(15,h==null?null:(h>0?1:(h>=nearZero?0.5:0)));
+    }
+    add(10,proximity(t.price,t.vw));
+    if(t.bb!=null&&t.price!=null){
+      const pct=(t.price-t.bb.mid)/(Math.abs(t.bb.mid)||1);
+      add(10,pct>=0?1:(pct>=-0.01?.5:0));
+    }
+    if(t.vr!=null){
+      const v=t.vr>=1.5?1:t.vr>=1.2?.7:t.vr>=0.8?.4:0;
+      add(10,v);
+    }
     if(!parts.length)return null;
-    const totalWeight=parts.reduce((a,x)=>a+x[0],0);
-    const earned=parts.reduce((a,x)=>a+(x[1]?x[0]:0),0);
-    return Math.round(earned/totalWeight*100);
+    const total=parts.reduce((a,x)=>a+x[0],0);
+    const earned=parts.reduce((a,x)=>a+x[0]*x[1],0);
+    return Math.round(earned/total*100);
   }
 
   function boolState(v){return v?'Bullish':'Bearish';}
@@ -222,32 +249,31 @@
 
   function buildAnalysis(entry){
     const d=entry.data||{}, t=tech(d), price=t.price;
-    const selectedPe=n(entry.peers?.selected?.pe ?? entry.peers?.selected?.pe);
+    const selectedPe=n(entry.peers?.selected?.pe);
     const peerPes=(entry.peers?.peers||[]).map(x=>n(x.pe)).filter(x=>x!=null&&x>0&&x<200);
-    const peerPe=median(peerPes);
+    const peerPe=peerPes.length>=3?median(peerPes):null;
     const basePe=selectedPe!=null&&selectedPe>0 ? selectedPe : null;
-    // Peer PE can occasionally be parsed incorrectly or contain a very distant outlier.
-    // Never let that produce a nonsensical fair value. If peer PE is outside a sane
-    // range versus the selected stock's PE, fall back to the stock's own PE.
-    const peerIsSane = peerPe!=null && basePe!=null && peerPe >= basePe*0.50 && peerPe <= basePe*2.00;
-    const fairPe = peerIsSane ? peerPe : basePe;
+
+    // Fair value is based on the stock's EPS (price / current PE) multiplied
+    // by the median PE of at least 3 valid peers. We do NOT fall back to the
+    // stock's own PE because that would make fair value equal to current price
+    // and incorrectly force the stock into HOLD.
     let fairValue=null, eps=null;
-    if(price!=null&&basePe!=null&&basePe>0&&fairPe!=null){
+    if(price!=null&&basePe!=null&&peerPe!=null){
       eps=price/basePe;
-      fairValue=eps*fairPe;
+      fairValue=eps*peerPe;
     }
-    // Buy price = 95% of the calculated fair value. This is the upper edge of BUY;
-    // below 80% of fair value is STRONG BUY.
-    const buyPrice=fairValue!=null ? fairValue*0.95 : null;
-    const strongBuyPrice=fairValue!=null ? fairValue*0.80 : null;
-    let zone='HOLD', zoneClass='hold';
-    if(price!=null&&fairValue!=null){
+
+    let zone='UNAVAILABLE', zoneClass='unknown';
+    if(price!=null&&fairValue!=null&&fairValue>0){
       const ratio=price/fairValue;
-      if(ratio<0.80){zone='STRONG BUY';zoneClass='strong';}
+      if(ratio<=0.80){zone='STRONG BUY';zoneClass='strong';}
       else if(ratio<0.95){zone='BUY';zoneClass='buy';}
       else if(ratio<=1.10){zone='HOLD';zoneClass='hold';}
       else {zone='SELL';zoneClass='sell';}
     }
+    const buyPrice=fairValue!=null ? fairValue*0.95 : null;
+    const strongBuyPrice=fairValue!=null ? fairValue*0.80 : null;
     const support=supportZone(d,t);
     const confirmation=confirmationScore(t);
     const techScore=technicalScore(t);
@@ -316,14 +342,14 @@
   }
 
   function rowHtml(e,i){
-    if(e.loading)return `<tr data-row-index="${i}"><td class="reorder-cell"></td><td>${i+1}</td><td colspan="12"><div class="loading-cell">Loading ${esc(e.symbol)} analysis…</div></td><td></td>`;
+    if(e.loading)return `<tr class="zone-row-loading" data-row-index="${i}"><td class="reorder-cell"></td><td>${i+1}</td><td colspan="12"><div class="loading-cell">Loading ${esc(e.symbol)} analysis…</div></td><td></td>`;
     const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t, price=t.price, ch=n(d.change), pct=n(d.percent_change);
     const [rsiStatus,rsiType]=rsiState(t.rsi);
     const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
     const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad';
     const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad';
     const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
-    let bbLabel='—',bbStatus='Neutral',bbType='warn';
+    let bbLabel='—',bbStatus='Unavailable',bbType='warn';
     if(t.bb&&price!=null){
       if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}
       else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}
@@ -335,7 +361,8 @@
     const confType=a.confirmation.percent>=70?'good':a.confirmation.percent>=50?'warn':'bad';
     const supportText=a.support.level!=null?`Support ${money(a.support.level)}`:'Support —';
     const buyText=a.support.buyLow!=null?`Buy ${money(a.support.buyLow)}–${money(a.support.buyHigh)}`:'Buy —';
-    return `<tr data-row-index="${i}">
+    const zoneRow=a.zoneClass||'unknown';
+    return `<tr data-row-index="${i}" class="zone-row ${zoneRow}">
       <td class="reorder-cell"><span class="reorder-handle" data-reorder="${i}" draggable="true" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></span></td>
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
@@ -366,6 +393,13 @@
   $('stockSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(item.symbol&&!busy){addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();}}});
   document.addEventListener('click',e=>{if(!e.target.closest('.analysis-search-box'))hideSuggestions();});
   $('addBtn').addEventListener('click',()=>{if(busy)return;const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(!item.symbol){setStatus('Search a stock first.',true);return;}addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();});
+  const infoBtn=$('tableInfoBtn'), infoModal=$('tableInfoModal');
+  function closeInfo(){if(infoModal)infoModal.classList.remove('show');}
+  if(infoBtn&&infoModal){
+    infoBtn.addEventListener('click',()=>infoModal.classList.add('show'));
+    infoModal.querySelectorAll('[data-close-info]').forEach(x=>x.addEventListener('click',closeInfo));
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')closeInfo();});
+  }
   $('refreshBtn').addEventListener('click',refreshAll);
   loadSavedStocks();
 })();
