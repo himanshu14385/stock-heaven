@@ -6,6 +6,8 @@
   let selectedSuggestion = null;
   let searchTimer = null;
   let lastUpdated = null;
+  let savedStocksLoaded = false;
+  let addInProgress = false;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -135,6 +137,8 @@
   }
 
   async function loadSavedStocks(){
+    savedStocksLoaded=false;
+    const btn=$('addBtn'); if(btn)btn.disabled=true;
     setStatus('Loading saved stocks…');
     try{
       const d=await api('/api/data/buy-zone');
@@ -142,16 +146,17 @@
       stocks.length=0;
       items.slice(0,MAX_STOCKS).forEach(x=>stocks.push({id:x.id,symbol:String(x.symbol||'').toUpperCase(),name:x.name||x.symbol,loading:true}));
       render();
-      if(!stocks.length){setStatus('No stocks saved yet.');return;}
+      if(!stocks.length){savedStocksLoaded=true;if(btn)btn.disabled=false;setStatus('No stocks saved yet.');return;}
       await Promise.all(stocks.map(async e=>{
         try{
           const [stock,peers]=await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(e.symbol)}`),api(`/api/peers?symbol=${encodeURIComponent(e.symbol)}`).catch(()=>({}))]);
           e.data=stock;e.peers=peers;e.loading=false;e.analysis=buildAnalysis(e);
         }catch(err){e.loading=false;e.refreshError=err.message||'Unable to analyse';}
       }));
-      lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();setStatus('Saved stocks loaded.');
+      lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();savedStocksLoaded=true;if(btn)btn.disabled=false;setStatus('Saved stocks loaded.');
     }catch(e){
       render();
+      savedStocksLoaded=true;if(btn)btn.disabled=false;
       setStatus(e.message||'Unable to load saved stocks',true);
     }
   }
@@ -181,35 +186,57 @@
   function hideSuggestions(){ $('stockSuggestions').classList.remove('show'); }
 
   async function addStock(item){
+    if(addInProgress){setStatus('Please wait — current stock is being added.',true);return;}
+    if(!savedStocksLoaded){setStatus('Please wait — saved stocks are loading.',true);return;}
     if(stocks.length>=MAX_STOCKS){setStatus('Maximum 15 stocks reached.',true);return;}
-    const symbol=String(item.symbol||'').trim().toUpperCase().replace(/\.NS$/i,''); if(!symbol)return;
+    const symbol=String(item.symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
+    if(!symbol)return;
     if(stocks.some(x=>x.symbol===symbol)){setStatus(`${symbol} is already added.`,true);return;}
 
-    // Save the stock to D1 first. A temporary market-data failure must never
-    // make an otherwise valid stock disappear from the user's Buy Zone list.
+    addInProgress=true;
+    const btn=$('addBtn');
+    if(btn)btn.disabled=true;
     const entry={symbol,name:item.name||symbol,loading:true};
-    stocks.push(entry); render(); setStatus(`Saving ${symbol}…`);
+    stocks.push(entry);
+    render();
+    setStatus(`Saving ${symbol}…`);
+
     try{
+      // Persist first. A market-data failure must never remove a successfully saved stock.
       await saveStocks();
     }catch(e){
-      const idx=stocks.indexOf(entry); if(idx>=0)stocks.splice(idx,1);
-      render(); setStatus(`${symbol}: ${e.message||'Unable to save to database'}`,true); return;
+      const idx=stocks.indexOf(entry);
+      if(idx>=0)stocks.splice(idx,1);
+      render();
+      setStatus(`${symbol}: ${e.message||'Unable to save to database'}`,true);
+      addInProgress=false;
+      if(btn)btn.disabled=false;
+      return;
     }
 
     setStatus(`Analysing ${symbol}…`);
     try{
-      const [stock,peers] = await Promise.all([
+      const [stock,peers]=await Promise.all([
         api(`/api/stock?symbol=${encodeURIComponent(symbol)}`),
         api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))
       ]);
-      entry.data=stock; entry.peers=peers; entry.loading=false; entry.analysis=buildAnalysis(entry); delete entry.refreshError;
-      lastUpdated=new Date(); $('lastUpdated').textContent=fmtTime();
-      render(); setStatus(`${symbol} added and saved to database.`);
+      entry.data=stock;
+      entry.peers=peers;
+      entry.loading=false;
+      entry.analysis=buildAnalysis(entry);
+      delete entry.refreshError;
+      lastUpdated=new Date();
+      $('lastUpdated').textContent=fmtTime();
+      render();
+      setStatus(`${symbol} added and saved to database.`);
     }catch(e){
       entry.loading=false;
       entry.refreshError=e.message||'Market data temporarily unavailable';
       render();
       setStatus(`${symbol} saved to database, but analysis is temporarily unavailable. Use Refresh to retry.`,true);
+    }finally{
+      addInProgress=false;
+      if(btn)btn.disabled=false;
     }
   }
 
@@ -275,18 +302,18 @@
   }
 
   function rowHtml(e,i){
-    if(e.loading)return `<tr><td>${i+1}</td><td colspan="12"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td></tr>`;
-    const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t, price=t.price, ch=n(d.change), pct=n(d.percent_change);
+    if(e.loading)return `<tr><td class="row-num">${i+1}</td><td colspan="12"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td></tr>`;
+    const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t,price=t.price,ch=n(d.change),pct=n(d.percent_change);
     const [rsiStatus,rsiType]=rsiState(t.rsi);
-    const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
+    const macBull=t.macd?t.macd.hist>=0:null,macType=macBull?'good':'bad';
     const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad';
     const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad';
     const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
     let bbLabel='—',bbStatus='Neutral',bbType='warn';
     if(t.bb&&price!=null){
-      if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}
-      else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}
-      else {bbLabel='In Range';bbStatus=price>=t.bb.mid?'Bullish':'Neutral';bbType=price>=t.bb.mid?'good':'warn'}
+      if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good';}
+      else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad';}
+      else {bbLabel='In Range';bbStatus=price>=t.bb.mid?'Bullish':'Neutral';bbType=price>=t.bb.mid?'good':'warn';}
     }
     const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad';
     const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
@@ -306,8 +333,8 @@
       ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',t.macd?(macBull?'Bullish':'Bearish'):'—',t.macd?macType:'warn')}
       ${techCell('Bollinger',bbLabel,bbStatus,bbType)}
       ${techCell('Volume',t.vr==null?'—':fixed(t.vr,1)+'× Avg',t.vr==null?'—':t.vr>=1.5?'Strong':t.vr<0.8?'Weak':'Neutral',volType)}
-      <td><div class="confirmation-box"><div class="confirmation-main tech-${confType}">${a.confirmation.hits}/${a.confirmation.available || 0}</div><span class="tech-tag">${a.confirmation.percent>=70?'Strong':a.confirmation.percent>=50?'Moderate':'Weak'}</span><div class="support-line">${supportText}</div><div class="buy-line">${buyText}</div></div></td>
-      <td><div class="score-box tech-${scoreType}"><strong>${a.techScore==null?'—':a.techScore}</strong><span>/100</span></div></td>
+      <td class="confirmation-cell"><div class="confirmation-box"><div class="confirmation-main tech-${confType}">${a.confirmation.hits}/${a.confirmation.available||0}</div><span class="tech-tag">${a.confirmation.percent>=70?'Strong':a.confirmation.percent>=50?'Moderate':'Weak'}</span><div class="support-line">${supportText}</div><div class="buy-line">${buyText}</div></div></td>
+      <td class="score-cell"><div class="score-box tech-${scoreType}"><strong>${a.techScore==null?'—':a.techScore}</strong><span>/100</span></div></td>
       <td class="action-cell"><button class="action-delete" title="Remove" data-delete="${i}"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
   }

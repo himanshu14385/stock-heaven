@@ -49,3 +49,36 @@
 .analysis-table tbody tr{height:84px}
 .analysis-table td.indicator-cell{height:84px;box-sizing:border-box}
 .analysis-table .tech-item{width:100%;overflow:hidden}
+
+/* FINAL Buy Zone table layout — one real <td> for every visible column. */
+.analysis-table-card.container-fluid{width:98%;margin:0 auto;border-radius:10px;overflow:hidden}
+.analysis-table-scroll{width:100%;overflow-x:auto;overflow-y:hidden}
+.analysis-table{width:100%;min-width:1450px;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.analysis-table th,.analysis-table td{box-sizing:border-box}
+.analysis-table th{height:52px;padding:8px 9px;text-align:center}
+.analysis-table td{height:84px;padding:8px 9px;vertical-align:middle;text-align:center}
+.analysis-table .col-num{width:38px;text-align:center!important}
+.analysis-table .col-stock{width:205px;text-align:left!important}
+.analysis-table .col-price{width:125px;text-align:left!important}
+.analysis-table .col-sma{width:105px;text-align:center!important}
+.analysis-table .col-indicator{width:100px;text-align:center!important}
+.analysis-table .col-confirmation{width:175px;text-align:center!important}
+.analysis-table .col-score{width:115px;text-align:center!important}
+.analysis-table .col-action{width:58px;text-align:center!important}
+.analysis-table td.indicator-cell{width:auto!important;min-width:0;text-align:center!important}
+.analysis-table .tech-item{width:100%;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden}
+.analysis-table .tech-label{font-size:11px;line-height:1.15}
+.analysis-table .tech-value{font-size:12px;line-height:1.15;margin-top:4px}
+.analysis-table .tech-tag{font-size:9px;line-height:1;margin-top:5px}
+.analysis-table .confirmation-cell,.analysis-table .score-cell{vertical-align:middle!important;text-align:center!important}
+.analysis-table .confirmation-box{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.analysis-table .confirmation-main{font-size:16px;font-weight:900}
+.analysis-table .support-line{font-size:10px;margin-top:6px;white-space:nowrap}
+.analysis-table .buy-line{font-size:11px;margin-top:2px;white-space:nowrap}
+.analysis-table .score-box{display:flex;align-items:baseline;justify-content:center;gap:2px}
+.analysis-table .score-box strong{font-size:20px}
+.analysis-table .score-box span{font-size:9px}
+.analysis-table tbody tr{height:84px}
+.analysis-table tbody tr:hover{background:#fbfdff}
+#addBtn:disabled{opacity:.6;cursor:wait}
+@media(max-width:700px){.analysis-table-card.container-fluid{width:100%;margin:0}.analysis-table{min-width:1450px}}
