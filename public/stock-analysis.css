@@ -19,3 +19,27 @@
 .current-view-badge:not(.view-hold):not(.view-sell){background:#dff8e9;color:#09884a;border:1px solid #c7eed7}
 .current-view-badge.view-hold{background:#fff1cc;color:#a16a00;border:1px solid #f0dfac}
 .current-view-badge.view-sell{background:#ffe0e2;color:#dc2f38;border:1px solid #f4c8cc}
+
+/* Buy Zone table view: compact indicator columns while preserving the existing visual style. */
+.analysis-table{min-width:1480px;table-layout:fixed}
+.analysis-table th,.analysis-table td{padding:8px 9px}
+.col-num{width:38px}.col-stock{width:190px}.col-price{width:118px}
+.col-sma{width:95px;text-align:center!important}.col-indicator{width:88px;text-align:center!important}
+.col-confirmation{width:150px;text-align:center!important}.col-score{width:100px;text-align:center!important}.col-action{width:52px}
+.analysis-table td:nth-child(n+4):nth-child(-n+11){text-align:center}
+.tech-grid{display:contents}
+.tech-item{min-width:0;text-align:center}
+.tech-label{font-size:11px;color:#66809f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tech-value{font-size:12px;font-weight:800;color:#17365f;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tech-tag{font-size:9px;margin-top:5px;padding:2px 6px;border-radius:4px}
+.confirmation-box{display:flex;flex-direction:column;align-items:center;line-height:1.15}
+.confirmation-main{font-size:16px;font-weight:900;line-height:1.1}
+.confirmation-box .tech-tag{margin-top:4px}
+.confirmation-main.tech-good{color:#09884a}.confirmation-main.tech-warn{color:#a16a00}.confirmation-main.tech-bad{color:#dc2f38}
+.support-line{font-size:10px;color:#687d98;margin-top:7px;white-space:nowrap}
+.buy-line{font-size:11px;color:#009688;font-weight:800;margin-top:2px;white-space:nowrap}
+.score-box{display:flex;align-items:baseline;justify-content:center;gap:2px}
+.score-box strong{font-size:19px;font-weight:900}
+.score-box span{font-size:9px;color:#71839b;font-weight:700}
+.score-box.tech-good strong{color:#09884a}.score-box.tech-warn strong{color:#a16a00}.score-box.tech-bad strong{color:#dc2f38}
+@media(max-width:700px){.analysis-table{min-width:1480px}}

@@ -55,6 +55,74 @@
   }
 
   function rsiState(r){ if(r==null)return ['Neutral','warn']; if(r<30)return ['Oversold','good']; if(r>70)return ['Overbought','bad']; return ['Neutral','warn']; }
+
+  function atr14(data){
+    const rows=(data.history||[]).filter(x=>n(x.close)!=null);
+    if(rows.length<15)return null;
+    const tr=[];
+    for(let i=1;i<rows.length;i++){
+      const h=n(rows[i].high),l=n(rows[i].low),pc=n(rows[i-1].close);
+      if(h==null||l==null||pc==null)continue;
+      tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));
+    }
+    if(tr.length<14)return null;
+    return tr.slice(-14).reduce((a,b)=>a+b,0)/14;
+  }
+
+  function supportZone(data,t){
+    const rows=(data.history||[]).filter(x=>n(x.close)!=null);
+    const price=t.price;
+    if(!rows.length||price==null)return {level:null,low:null,high:null,buyLow:null,buyHigh:null};
+    const start=Math.max(2,rows.length-60);
+    const swings=[];
+    for(let i=start;i<rows.length-2;i++){
+      const l=n(rows[i].low);
+      if(l==null||l>=price)continue;
+      const left=[n(rows[i-1].low),n(rows[i-2].low)].filter(x=>x!=null);
+      const right=[n(rows[i+1].low),n(rows[i+2].low)].filter(x=>x!=null);
+      if(left.length===2&&right.length===2&&l<=Math.min(...left)&&l<=Math.min(...right))swings.push(l);
+    }
+    const recentLows=rows.slice(-20).map(x=>n(x.low)).filter(x=>x!=null&&x<price);
+    const near=swings.filter(x=>x>=price*0.75&&x<=price);
+    let level=near.length?Math.max(...near):null;
+    if(level==null&&recentLows.length)level=Math.max(...recentLows);
+    if(level==null)return {level:null,low:null,high:null,buyLow:null,buyHigh:null};
+    const atr=atr14(data)||price*0.02;
+    const low=Math.max(0,level-atr*0.35);
+    const high=level+atr*0.25;
+    return {level,low,high,buyLow:low,buyHigh:high};
+  }
+
+  function confirmationScore(t){
+    const checks=[];
+    if(t.s20!=null&&t.price!=null)checks.push(t.price>t.s20);
+    if(t.s50!=null&&t.price!=null)checks.push(t.price>t.s50);
+    if(t.s200!=null&&t.price!=null)checks.push(t.price>t.s200);
+    if(t.rsi!=null)checks.push(t.rsi>=45&&t.rsi<=65);
+    if(t.macd!=null)checks.push(t.macd.hist>0);
+    if(t.vw!=null&&t.price!=null)checks.push(t.price>=t.vw);
+    if(t.bb!=null&&t.price!=null)checks.push(t.price>=t.bb.mid);
+    if(t.vr!=null)checks.push(t.vr>=1.2);
+    const available=checks.length, hits=checks.filter(Boolean).length;
+    return {hits,available,percent:available?Math.round(hits/available*100):0};
+  }
+
+  function technicalScore(t){
+    const parts=[];
+    if(t.s20!=null&&t.price!=null)parts.push([15,t.price>t.s20]);
+    if(t.s50!=null&&t.price!=null)parts.push([15,t.price>t.s50]);
+    if(t.s200!=null&&t.price!=null)parts.push([15,t.price>t.s200]);
+    if(t.rsi!=null)parts.push([10,t.rsi>=45&&t.rsi<=65]);
+    if(t.macd!=null)parts.push([15,t.macd.hist>0]);
+    if(t.vw!=null&&t.price!=null)parts.push([10,t.price>=t.vw]);
+    if(t.bb!=null&&t.price!=null)parts.push([10,t.price>=t.bb.mid]);
+    if(t.vr!=null)parts.push([10,t.vr>=1.2]);
+    if(!parts.length)return null;
+    const totalWeight=parts.reduce((a,x)=>a+x[0],0);
+    const earned=parts.reduce((a,x)=>a+(x[1]?x[0]:0),0);
+    return Math.round(earned/totalWeight*100);
+  }
+
   function boolState(v){return v?'Bullish':'Bearish';}
   function techCell(label,value,status,type='neutral'){
     return `<div class="tech-item tech-${type}"><div class="tech-label">${esc(label)}</div><div class="tech-value">${esc(value)}</div><span class="tech-tag">${esc(status)}</span></div>`;
@@ -156,7 +224,10 @@
       else if(ratio<=1.10){zone='HOLD';zoneClass='hold';}
       else {zone='SELL';zoneClass='sell';}
     }
-    return {t,selectedPe,peerPe,fairValue,buyPrice,strongBuyPrice,fair:fairValue,eps,zone,zoneClass};
+    const support=supportZone(d,t);
+    const confirmation=confirmationScore(t);
+    const techScore=technicalScore(t);
+    return {t,selectedPe,peerPe,fairValue,buyPrice,strongBuyPrice,fair:fairValue,eps,zone,zoneClass,support,confirmation,techScore};
   }
 
   function render(){
@@ -187,36 +258,42 @@
   }
 
   function rowHtml(e,i){
-    if(e.loading)return `<tr><td>${i+1}</td><td colspan="6"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td><td></td></tr>`;
+    if(e.loading)return `<tr><td>${i+1}</td><td colspan="12"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td></tr>`;
     const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t, price=t.price, ch=n(d.change), pct=n(d.percent_change);
-    const [rsiStatus,rsiType]=rsiState(t.rsi); const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
-    // Status and colour must always agree: Bullish = green, Bearish = red.
-    const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad'; const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad'; const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
-    let bbLabel='—',bbStatus='Neutral',bbType='warn'; if(t.bb&&price!=null){if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}else{bbLabel='In Range';bbStatus='Neutral';bbType='warn'}}
-    const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad'; const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
-    const trendType=t.trend==='Uptrend'?'good':t.trend==='Downtrend'?'bad':'warn';
-    const currentClass=a.zoneClass==='hold'?'view-hold':a.zoneClass==='sell'?'view-sell':'';
-    const currentView=a.zoneClass==='hold'?'HOLD':a.zoneClass==='sell'?'SELL':'BUY';
+    const [rsiStatus,rsiType]=rsiState(t.rsi);
+    const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
+    const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad';
+    const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad';
+    const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
+    let bbLabel='—',bbStatus='Neutral',bbType='warn';
+    if(t.bb&&price!=null){
+      if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}
+      else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}
+      else {bbLabel='In Range';bbStatus=price>=t.bb.mid?'Bullish':'Neutral';bbType=price>=t.bb.mid?'good':'warn'}
+    }
+    const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad';
+    const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
+    const scoreType=a.techScore==null?'warn':a.techScore>=70?'good':a.techScore>=50?'warn':'bad';
+    const confType=a.confirmation.percent>=70?'good':a.confirmation.percent>=50?'warn':'bad';
+    const supportText=a.support.level!=null?`Support ${money(a.support.level)}`:'Support —';
+    const buyText=a.support.buyLow!=null?`Buy ${money(a.support.buyLow)}–${money(a.support.buyHigh)}`:'Buy —';
     return `<tr>
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
       <td><div class="price-main">${money(price)}</div><div class="price-change ${ch!=null&&ch>=0?'up':'down'}">${ch==null?'—':(ch>=0?'+':'')+fixed(ch)} (${pct==null?'—':(pct>=0?'+':'')+fixed(pct,2)+'%'})</div></td>
-      <td>${a.zoneClass==='hold'?'':`<span class="zone-badge ${zoneClass(a)}">${esc(a.zone)}</span>`}<div class="zone-range">Buy Price: <b>${money(a.buyPrice)}</b></div></td>
-      <td><span class="current-view-badge ${currentClass}">${currentView}</span></td>
-      <td><div class="tech-grid">
-        ${techCell('RSI (14)',fixed(t.rsi,1),rsiStatus,rsiType)}
-        ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',macBull?'Bullish':'Bearish',macType)}
-        ${techCell('SMA 20',money(t.s20),t.s20==null?'—':price>t.s20?'Bullish':'Bearish',s20Type)}
-        ${techCell('SMA 50',money(t.s50),t.s50==null?'—':price>t.s50?'Bullish':'Bearish',s50Type)}
-        ${techCell('SMA 200',money(t.s200),t.s200==null?'—':price>t.s200?'Bullish':'Bearish',s200Type)}
-        ${techCell('Bollinger',bbLabel,bbStatus,bbType)}
-        ${techCell('VWAP',money(t.vw),t.vw==null?'—':price>=t.vw?'Bullish':'Bearish',vwType)}
-        ${techCell('Volume',t.vr==null?'—':fixed(t.vr,1)+'× Avg',t.vr==null?'—':t.vr>=1.5?'Bullish':t.vr<0.8?'Weak':'Neutral',volType)}
-      </div></td>
+      ${techCell('SMA 20',money(t.s20),t.s20==null?'—':price>t.s20?'Bullish':'Bearish',s20Type)}
+      ${techCell('SMA 50',money(t.s50),t.s50==null?'—':price>t.s50?'Bullish':'Bearish',s50Type)}
+      ${techCell('SMA 200',money(t.s200),t.s200==null?'—':price>t.s200?'Bullish':'Bearish',s200Type)}
+      ${techCell('RSI (14)',fixed(t.rsi,1),rsiStatus,rsiType)}
+      ${techCell('VWAP',money(t.vw),t.vw==null?'—':price>=t.vw?'Bullish':'Bearish',vwType)}
+      ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',t.macd?(macBull?'Bullish':'Bearish'):'—',t.macd?macType:'warn')}
+      ${techCell('Bollinger',bbLabel,bbStatus,bbType)}
+      ${techCell('Volume',t.vr==null?'—':fixed(t.vr,1)+'× Avg',t.vr==null?'—':t.vr>=1.5?'Strong':t.vr<0.8?'Weak':'Neutral',volType)}
+      <td><div class="confirmation-box"><div class="confirmation-main tech-${confType}">${a.confirmation.hits}/${a.confirmation.available || 0}</div><span class="tech-tag">${a.confirmation.percent>=70?'Strong':a.confirmation.percent>=50?'Moderate':'Weak'}</span><div class="support-line">${supportText}</div><div class="buy-line">${buyText}</div></div></td>
+      <td><div class="score-box tech-${scoreType}"><strong>${a.techScore==null?'—':a.techScore}</strong><span>/100</span></div></td>
       <td class="action-cell"><button class="action-delete" title="Remove" data-delete="${i}"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
   }
-
 
   async function refreshAll(){
     if(!stocks.length){setStatus('Add stocks first.');return;}
