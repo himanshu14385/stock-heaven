@@ -254,30 +254,68 @@
     const peerPe=peerPes.length>=3?median(peerPes):null;
     const basePe=selectedPe!=null&&selectedPe>0 ? selectedPe : null;
 
-    // Fair value is based on the stock's EPS (price / current PE) multiplied
-    // by the median PE of at least 3 valid peers. We do NOT fall back to the
-    // stock's own PE because that would make fair value equal to current price
-    // and incorrectly force the stock into HOLD.
+    // VALUATION ZONE:
+    // Fair value is valid only when we have the stock PE and at least 3 valid peer PEs.
+    // We intentionally do not use the stock's own PE as a peer fallback because that
+    // would make fair value equal to the current price.
     let fairValue=null, eps=null;
     if(price!=null&&basePe!=null&&peerPe!=null){
       eps=price/basePe;
       fairValue=eps*peerPe;
     }
 
-    let zone='UNAVAILABLE', zoneClass='unknown';
+    let valuationZone='UNAVAILABLE', valuationClass='unknown';
     if(price!=null&&fairValue!=null&&fairValue>0){
       const ratio=price/fairValue;
-      if(ratio<=0.80){zone='STRONG BUY';zoneClass='strong';}
-      else if(ratio<0.95){zone='BUY';zoneClass='buy';}
-      else if(ratio<=1.10){zone='HOLD';zoneClass='hold';}
-      else {zone='SELL';zoneClass='sell';}
+      if(ratio<=0.80){valuationZone='STRONG BUY';valuationClass='strong';}
+      else if(ratio<0.95){valuationZone='BUY';valuationClass='buy';}
+      else if(ratio<=1.10){valuationZone='HOLD';valuationClass='hold';}
+      else {valuationZone='SELL';valuationClass='sell';}
     }
+
     const buyPrice=fairValue!=null ? fairValue*0.95 : null;
     const strongBuyPrice=fairValue!=null ? fairValue*0.80 : null;
     const support=supportZone(d,t);
     const confirmation=confirmationScore(t);
     const techScore=technicalScore(t);
-    return {t,selectedPe,peerPe,fairValue,buyPrice,strongBuyPrice,fair:fairValue,eps,zone,zoneClass,support,confirmation,techScore};
+
+    // FINAL ACTIONABLE ZONE:
+    // Valuation alone must NEVER create a Strong Buy/Buy when technical confirmation
+    // is weak. This prevents a cheap stock in a strong downtrend from being labelled
+    // Strong Buy.
+    let zone=valuationZone, zoneClass=valuationClass;
+    const conf=confirmation.available;
+    const hits=confirmation.hits;
+    const score=techScore;
+
+    if(valuationClass==='strong'){
+      if(conf>=8 && hits>=6 && score!=null && score>=70){
+        zone='STRONG BUY'; zoneClass='strong';
+      }else if(conf>=6 && hits>=4 && score!=null && score>=50){
+        zone='BUY'; zoneClass='buy';
+      }else{
+        zone='HOLD'; zoneClass='hold';
+      }
+    }else if(valuationClass==='buy'){
+      if(conf>=6 && hits>=4 && score!=null && score>=50){
+        zone='BUY'; zoneClass='buy';
+      }else{
+        zone='HOLD'; zoneClass='hold';
+      }
+    }else if(valuationClass==='sell'){
+      // Overvaluation + weak technicals = SELL. If technicals are supportive,
+      // avoid a blind SELL and show HOLD/Caution instead.
+      if(conf>=6 && hits>=4 && score!=null && score>=50){
+        zone='HOLD'; zoneClass='hold';
+      }else{
+        zone='SELL'; zoneClass='sell';
+      }
+    }
+
+    return {
+      t,selectedPe,peerPe,fairValue,buyPrice,strongBuyPrice,fair:fairValue,eps,
+      valuationZone,valuationClass,zone,zoneClass,support,confirmation,techScore
+    };
   }
 
   function render(){
