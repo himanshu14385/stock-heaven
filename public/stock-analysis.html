@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Buy Zone • Stock Heaven</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="stock-analysis.css?v=20260908-1400">
+  <link rel="stylesheet" href="stock-analysis.css?v=20260908-1500">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="auth.css">
   <script src="auth.js"></script>
@@ -56,15 +56,12 @@
       </section>
     </section>
 
-
-  </main>
-</div>
-
     <section class="analysis-table-card container-fluid">
       <div class="analysis-table-scroll">
         <table class="analysis-table">
           <thead>
             <tr>
+              <th class="col-handle" aria-label="Reorder"></th>
               <th class="col-num">#</th>
               <th class="col-stock">Stock</th>
               <th class="col-price">Price<div>Change</div></th>
@@ -76,7 +73,7 @@
               <th class="col-indicator">MACD</th>
               <th class="col-indicator">Bollinger</th>
               <th class="col-indicator">Volume</th>
-              <th class="col-confirmation">Confirmation</th>
+              <th class="col-confirmation">Confirmation<div>Support · Buy Range</div></th>
               <th class="col-score">Technical Score</th>
               <th class="col-action">Action</th>
             </tr>
@@ -96,7 +93,9 @@
       <span>Last updated: <b id="lastUpdated">—</b> <button id="refreshBtn" class="refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button></span>
     </div>
 
+  </main>
+</div>
 
-<script src="stock-analysis.js?v=20260908-1400"></script>
+<script src="stock-analysis.js?v=20260908-1500"></script>
 </body>
 </html>

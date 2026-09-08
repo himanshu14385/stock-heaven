@@ -6,8 +6,7 @@
   let selectedSuggestion = null;
   let searchTimer = null;
   let lastUpdated = null;
-  let savedStocksLoaded = false;
-  let addInProgress = false;
+  let busy = false;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -131,34 +130,40 @@
   }
 
   async function api(path, options={}){
-    const r=await fetch(path,{cache:'no-store',credentials:'same-origin',...options});
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||d.error)throw new Error(d.error||`Request failed (${r.status})`); return d;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),20000);
+    try{
+      const r=await fetch(path,{cache:'no-store',credentials:'same-origin',...options,signal:controller.signal});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok||d.error)throw new Error(d.error||`Request failed (${r.status})`);
+      return d;
+    }catch(e){
+      if(e?.name==='AbortError')throw new Error('Request timed out. Please try again.');
+      throw e;
+    }finally{clearTimeout(timer);}
   }
 
   async function loadSavedStocks(){
-    savedStocksLoaded=false;
-    const btn=$('addBtn'); if(btn)btn.disabled=true;
     setStatus('Loading saved stocks…');
+    busy=true; setBusy(true);
     try{
       const d=await api('/api/data/buy-zone');
       const items=Array.isArray(d.items)?d.items:[];
       stocks.length=0;
       items.slice(0,MAX_STOCKS).forEach(x=>stocks.push({id:x.id,symbol:String(x.symbol||'').toUpperCase(),name:x.name||x.symbol,loading:true}));
       render();
-      if(!stocks.length){savedStocksLoaded=true;if(btn)btn.disabled=false;setStatus('No stocks saved yet.');return;}
+      if(!stocks.length){setStatus('No stocks saved yet.');return;}
       await Promise.all(stocks.map(async e=>{
         try{
           const [stock,peers]=await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(e.symbol)}`),api(`/api/peers?symbol=${encodeURIComponent(e.symbol)}`).catch(()=>({}))]);
           e.data=stock;e.peers=peers;e.loading=false;e.analysis=buildAnalysis(e);
         }catch(err){e.loading=false;e.refreshError=err.message||'Unable to analyse';}
       }));
-      lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();savedStocksLoaded=true;if(btn)btn.disabled=false;setStatus('Saved stocks loaded.');
+      lastUpdated=new Date();$('lastUpdated').textContent=fmtTime();render();setStatus('Saved stocks loaded.');
     }catch(e){
       render();
-      savedStocksLoaded=true;if(btn)btn.disabled=false;
       setStatus(e.message||'Unable to load saved stocks',true);
-    }
+    }finally{busy=false;setBusy(false);}
   }
 
   async function saveStocks(){
@@ -167,6 +172,10 @@
     const saved=Array.isArray(d.items)?d.items:[];
     saved.forEach((x,i)=>{if(stocks[i])stocks[i].id=x.id;});
     return d;
+  }
+
+  function setBusy(v){
+    const btn=$('addBtn'); if(btn){btn.disabled=!!v; btn.title=v?'Please wait':'Add stock';}
   }
 
   async function searchStocks(q){
@@ -186,58 +195,29 @@
   function hideSuggestions(){ $('stockSuggestions').classList.remove('show'); }
 
   async function addStock(item){
-    if(addInProgress){setStatus('Please wait — current stock is being added.',true);return;}
-    if(!savedStocksLoaded){setStatus('Please wait — saved stocks are loading.',true);return;}
+    if(busy)return;
     if(stocks.length>=MAX_STOCKS){setStatus('Maximum 15 stocks reached.',true);return;}
     const symbol=String(item.symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
     if(!symbol)return;
     if(stocks.some(x=>x.symbol===symbol)){setStatus(`${symbol} is already added.`,true);return;}
 
-    addInProgress=true;
-    const btn=$('addBtn');
-    if(btn)btn.disabled=true;
     const entry={symbol,name:item.name||symbol,loading:true};
-    stocks.push(entry);
-    render();
-    setStatus(`Saving ${symbol}…`);
-
+    stocks.push(entry); render(); busy=true; setBusy(true); setStatus(`Saving ${symbol}…`);
     try{
-      // Persist first. A market-data failure must never remove a successfully saved stock.
-      await saveStocks();
+      const saved=await api('/api/data/buy-zone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol,name:entry.name})});
+      entry.id=saved.item?.id||null;
+      setStatus(`Saved ${symbol}. Loading analysis…`);
+      try{
+        const [stock,peers]=await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(symbol)}`),api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))]);
+        entry.data=stock; entry.peers=peers; entry.analysis=buildAnalysis(entry); entry.loading=false; entry.refreshError=null;
+        lastUpdated=new Date(); $('lastUpdated').textContent=fmtTime(); render(); setStatus(`${symbol} added and saved to database.`);
+      }catch(err){
+        entry.loading=false; entry.refreshError=err.message||'Analysis unavailable'; render(); setStatus(`${symbol} saved. Analysis unavailable — use Refresh to retry.`,true);
+      }
     }catch(e){
-      const idx=stocks.indexOf(entry);
-      if(idx>=0)stocks.splice(idx,1);
-      render();
-      setStatus(`${symbol}: ${e.message||'Unable to save to database'}`,true);
-      addInProgress=false;
-      if(btn)btn.disabled=false;
-      return;
-    }
-
-    setStatus(`Analysing ${symbol}…`);
-    try{
-      const [stock,peers]=await Promise.all([
-        api(`/api/stock?symbol=${encodeURIComponent(symbol)}`),
-        api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))
-      ]);
-      entry.data=stock;
-      entry.peers=peers;
-      entry.loading=false;
-      entry.analysis=buildAnalysis(entry);
-      delete entry.refreshError;
-      lastUpdated=new Date();
-      $('lastUpdated').textContent=fmtTime();
-      render();
-      setStatus(`${symbol} added and saved to database.`);
-    }catch(e){
-      entry.loading=false;
-      entry.refreshError=e.message||'Market data temporarily unavailable';
-      render();
-      setStatus(`${symbol} saved to database, but analysis is temporarily unavailable. Use Refresh to retry.`,true);
-    }finally{
-      addInProgress=false;
-      if(btn)btn.disabled=false;
-    }
+      const idx=stocks.indexOf(entry); if(idx>=0)stocks.splice(idx,1); render();
+      setStatus(`${symbol}: ${e.message||'Unable to save'}`,true);
+    }finally{busy=false;setBusy(false);}
   }
 
   function buildAnalysis(entry){
@@ -281,12 +261,46 @@
       if(entry.analysis)counts[entry.analysis.zone]=(counts[entry.analysis.zone]||0)+1;
       body.insertAdjacentHTML('beforeend', rowHtml(entry,i));
     });
-    $('countAll').textContent=stocks.length;$('countBuy').textContent=counts.BUY||0;$('countHold').textContent=counts.HOLD||0;$('countSell').textContent=counts.SELL||0;$('countStrong').textContent=counts['STRONG BUY']||0;
+    $('countAll').textContent=stocks.length; $('countBuy').textContent=counts.BUY||0; $('countHold').textContent=counts.HOLD||0; $('countSell').textContent=counts.SELL||0; $('countStrong').textContent=counts['STRONG BUY']||0;
+
     body.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',async()=>{
+      if(busy)return;
       const i=Number(b.dataset.delete); const removed=stocks[i]; if(!removed)return;
-      stocks.splice(i,1); render(); setStatus('Saving…');
+      stocks.splice(i,1); render(); busy=true; setBusy(true); setStatus('Saving…');
       try{await saveStocks();setStatus(`${removed.symbol} removed.`);}catch(e){stocks.splice(i,0,removed);render();setStatus(e.message||'Unable to save changes',true);}
+      finally{busy=false;setBusy(false);}
     }));
+
+    body.querySelectorAll('[data-reorder]').forEach(handle=>{
+      handle.addEventListener('dragstart',e=>{
+        if(busy)return;
+        const i=Number(handle.dataset.reorder);
+        e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',String(i));
+        const row=handle.closest('tr'); if(row)row.classList.add('dragging');
+      });
+      handle.addEventListener('dragend',()=>{body.querySelectorAll('tr.dragging').forEach(r=>r.classList.remove('dragging'));});
+    });
+    body.querySelectorAll('tr[data-row-index]').forEach(row=>{
+      row.addEventListener('dragover',e=>{if(!busy){e.preventDefault();row.classList.add('drag-over');}});
+      row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+      row.addEventListener('drop',async e=>{
+        e.preventDefault(); row.classList.remove('drag-over'); if(busy)return;
+        const from=Number(e.dataTransfer.getData('text/plain')), to=Number(row.dataset.rowIndex);
+        if(!Number.isInteger(from)||!Number.isInteger(to)||from===to)return;
+        const old=stocks.map(x=>x.id);
+        [stocks[from],stocks[to]]=[stocks[to],stocks[from]];
+        render(); busy=true; setBusy(true); setStatus('Saving order…');
+        try{
+          const order=stocks.map(x=>x.id).filter(x=>x!=null);
+          await api('/api/data/buy-zone',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({order})});
+          setStatus('Order saved.');
+        }catch(err){
+          // Restore by DB ids when the save fails.
+          const byId=new Map(stocks.map(x=>[x.id,x])); stocks.length=0; old.forEach(id=>{const x=byId.get(id);if(x)stocks.push(x);});
+          render(); setStatus(err.message||'Unable to save order',true);
+        }finally{busy=false;setBusy(false);}
+      });
+    });
   }
 
   function logoUrl(symbol){return `https://cdn.simpleicons.org/${encodeURIComponent(String(symbol).toLowerCase())}`;}
@@ -302,18 +316,18 @@
   }
 
   function rowHtml(e,i){
-    if(e.loading)return `<tr><td class="row-num">${i+1}</td><td colspan="12"><div style="color:#71839b;padding:10px 0">Loading ${esc(e.symbol)} analysis…</div></td></tr>`;
-    const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t,price=t.price,ch=n(d.change),pct=n(d.percent_change);
+    if(e.loading)return `<tr data-row-index="${i}"><td class="reorder-cell"></td><td>${i+1}</td><td colspan="12"><div class="loading-cell">Loading ${esc(e.symbol)} analysis…</div></td><td></td>`;
+    const d=e.data||{},a=e.analysis||buildAnalysis(e),t=a.t, price=t.price, ch=n(d.change), pct=n(d.percent_change);
     const [rsiStatus,rsiType]=rsiState(t.rsi);
-    const macBull=t.macd?t.macd.hist>=0:null,macType=macBull?'good':'bad';
+    const macBull=t.macd?t.macd.hist>=0:null; const macType=macBull?'good':'bad';
     const s20Type=t.s20==null?'warn':price>t.s20?'good':'bad';
     const s50Type=t.s50==null?'warn':price>t.s50?'good':'bad';
     const s200Type=t.s200==null?'warn':price>t.s200?'good':'bad';
     let bbLabel='—',bbStatus='Neutral',bbType='warn';
     if(t.bb&&price!=null){
-      if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good';}
-      else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad';}
-      else {bbLabel='In Range';bbStatus=price>=t.bb.mid?'Bullish':'Neutral';bbType=price>=t.bb.mid?'good':'warn';}
+      if(price<t.bb.lower){bbLabel='Below Lower';bbStatus='Oversold';bbType='good'}
+      else if(price>t.bb.upper){bbLabel='Above Upper';bbStatus='Overbought';bbType='bad'}
+      else {bbLabel='In Range';bbStatus=price>=t.bb.mid?'Bullish':'Neutral';bbType=price>=t.bb.mid?'good':'warn'}
     }
     const vwType=t.vw==null?'warn':price>=t.vw?'good':'bad';
     const volType=t.vr==null?'warn':t.vr>=1.5?'good':t.vr<0.8?'bad':'warn';
@@ -321,7 +335,8 @@
     const confType=a.confirmation.percent>=70?'good':a.confirmation.percent>=50?'warn':'bad';
     const supportText=a.support.level!=null?`Support ${money(a.support.level)}`:'Support —';
     const buyText=a.support.buyLow!=null?`Buy ${money(a.support.buyLow)}–${money(a.support.buyHigh)}`:'Buy —';
-    return `<tr>
+    return `<tr data-row-index="${i}">
+      <td class="reorder-cell"><span class="reorder-handle" data-reorder="${i}" draggable="true" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></span></td>
       <td class="row-num">${i+1}</td>
       <td><div class="stock-cell"><div class="stock-logo"><img src="${logoUrl(e.symbol)}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='${esc(e.symbol.slice(0,2))}'"></div><div class="stock-name"><b>${esc(e.name)}</b><span>${esc(e.symbol)}</span></div></div></td>
       <td><div class="price-main">${money(price)}</div><div class="price-change ${ch!=null&&ch>=0?'up':'down'}">${ch==null?'—':(ch>=0?'+':'')+fixed(ch)} (${pct==null?'—':(pct>=0?'+':'')+fixed(pct,2)+'%'})</div></td>
@@ -333,8 +348,8 @@
       ${techCell('MACD',t.macd?fixed(t.macd.hist,2):'—',t.macd?(macBull?'Bullish':'Bearish'):'—',t.macd?macType:'warn')}
       ${techCell('Bollinger',bbLabel,bbStatus,bbType)}
       ${techCell('Volume',t.vr==null?'—':fixed(t.vr,1)+'× Avg',t.vr==null?'—':t.vr>=1.5?'Strong':t.vr<0.8?'Weak':'Neutral',volType)}
-      <td class="confirmation-cell"><div class="confirmation-box"><div class="confirmation-main tech-${confType}">${a.confirmation.hits}/${a.confirmation.available||0}</div><span class="tech-tag">${a.confirmation.percent>=70?'Strong':a.confirmation.percent>=50?'Moderate':'Weak'}</span><div class="support-line">${supportText}</div><div class="buy-line">${buyText}</div></div></td>
-      <td class="score-cell"><div class="score-box tech-${scoreType}"><strong>${a.techScore==null?'—':a.techScore}</strong><span>/100</span></div></td>
+      <td><div class="confirmation-box"><div class="confirmation-main tech-${confType}">${a.confirmation.hits}/${a.confirmation.available||0}</div><span class="tech-tag">${a.confirmation.percent>=70?'Strong':a.confirmation.percent>=50?'Moderate':'Weak'}</span><div class="support-line">${supportText}</div><div class="buy-line">${buyText}</div></div></td>
+      <td><div class="score-box tech-${scoreType}"><strong>${a.techScore==null?'—':a.techScore}</strong><span>/100</span></div></td>
       <td class="action-cell"><button class="action-delete" title="Remove" data-delete="${i}"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
   }
@@ -348,16 +363,9 @@
 
 
   $('stockSearch').addEventListener('input',()=>{selectedSuggestion=null;clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchStocks($('stockSearch').value),220);});
-  $('stockSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(item.symbol){addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();}}});
+  $('stockSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(item.symbol&&!busy){addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();}}});
   document.addEventListener('click',e=>{if(!e.target.closest('.analysis-search-box'))hideSuggestions();});
-  $('addBtn').addEventListener('click',()=>{const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(!item.symbol){setStatus('Search a stock first.',true);return;}addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();});
-  $('clearAllBtn').addEventListener('click',async()=>{
-    if(!stocks.length)return;
-    if(!confirm('Remove all stocks from Buy Zone?'))return;
-    const backup=stocks.slice(); stocks.length=0; render(); setStatus('Removing all stocks…');
-    try{await saveStocks();setStatus('All stocks removed from database.');}
-    catch(e){stocks.push(...backup);render();setStatus(e.message||'Unable to clear database',true);}
-  });
+  $('addBtn').addEventListener('click',()=>{if(busy)return;const item=selectedSuggestion||{symbol:$('stockSearch').value.trim().toUpperCase(),name:$('stockSearch').value.trim()};if(!item.symbol){setStatus('Search a stock first.',true);return;}addStock(item);$('stockSearch').value='';selectedSuggestion=null;hideSuggestions();});
   $('refreshBtn').addEventListener('click',refreshAll);
   loadSavedStocks();
 })();
