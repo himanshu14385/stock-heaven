@@ -26,7 +26,6 @@
 .col-num{width:38px}.col-stock{width:190px}.col-price{width:118px}
 .col-sma{width:95px;text-align:center!important}.col-indicator{width:88px;text-align:center!important}
 .col-confirmation{width:150px;text-align:center!important}.col-score{width:100px;text-align:center!important}.col-action{width:52px}
-.analysis-table td:nth-child(n+4):nth-child(-n+11){text-align:center}
 .tech-grid{display:contents}
 .tech-item{min-width:0;text-align:center}
 .tech-label{font-size:11px;color:#66809f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -48,7 +47,7 @@
 /* Buy Zone v7: stable table structure + reorder handle */
 .analysis-main{max-width:none!important;margin:0!important}
 .analysis-control-container{max-width:1500px}
-.analysis-table-card.container-fluid{width:calc(100% - 24px)!important;max-width:none!important;margin:0 12px!important;box-sizing:border-box}
+.analysis-table-card.container-fluid{max-width:none!important;box-sizing:border-box}
 .analysis-table-scroll{width:100%;overflow-x:auto}
 .analysis-table{width:100%;min-width:1540px!important;table-layout:fixed}
 .analysis-table th,.analysis-table td{box-sizing:border-box}
@@ -70,5 +69,4 @@
 .analysis-table tbody tr.drag-over{background:#f2f7ff;box-shadow:inset 0 2px 0 #1769ff,inset 0 -2px 0 #1769ff}
 .loading-cell{padding:10px 0;color:#71839b}
 .confirmation-main{font-size:16px!important}.support-line{font-size:10px!important}.buy-line{font-size:11px!important}
-.analysis-footer{width:calc(100% - 24px)!important;margin:5px 12px!important}
 @media(max-width:700px){.analysis-table-card.container-fluid{width:calc(100% - 16px)!important;margin:0 8px!important}.analysis-table{min-width:1540px!important}}
