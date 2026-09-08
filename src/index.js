@@ -664,6 +664,29 @@ async function dataJson(request,env,url){
   if(url.pathname==='/api/data/buy-zone'){
     if(request.method==='GET')return json({items:await getBuyZoneData(env)});
     if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='POST'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+      await ensureBuyZoneSchema(env);
+      const symbol=String(b.symbol||'').trim().toUpperCase().replace(/\.NS$/i,'');
+      const name=String(b.name||symbol).trim();
+      if(!symbol)return json({error:'Stock symbol is required'},400);
+      const existing=await env.AUTH_DB.prepare(`SELECT id,symbol,name,sort_order,added_at,updated_at FROM buy_zone_stocks WHERE symbol=?`).bind(symbol).first();
+      if(existing)return json({item:existing,alreadyExists:true});
+      const next=await env.AUTH_DB.prepare(`SELECT COALESCE(MAX(sort_order),-1)+1 AS next_order FROM buy_zone_stocks`).first();
+      const order=Math.min(Number(next?.next_order||0),14);
+      const result=await env.AUTH_DB.prepare(`INSERT INTO buy_zone_stocks(symbol,name,sort_order,added_at,updated_at) VALUES (?,?,?,?,?)`).bind(symbol,name,order,nowIso(),nowIso()).run();
+      const item=await env.AUTH_DB.prepare(`SELECT id,symbol,name,sort_order,added_at,updated_at FROM buy_zone_stocks WHERE id=?`).bind(result.meta?.last_row_id).first();
+      return json({ok:true,item});
+    }
+    if(request.method==='PATCH'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+      const order=Array.isArray(b.order)?b.order.map(Number).filter(Number.isInteger):[];
+      const rows=await env.AUTH_DB.prepare(`SELECT id FROM buy_zone_stocks ORDER BY sort_order,id`).all();
+      const existing=(rows.results||[]).map(r=>Number(r.id));
+      if(order.length!==existing.length || new Set(order).size!==existing.length || order.some(id=>!existing.includes(id)))return json({error:'Invalid stock order'},400);
+      if(order.length)await env.AUTH_DB.batch(order.map((id,i)=>env.AUTH_DB.prepare(`UPDATE buy_zone_stocks SET sort_order=?,updated_at=? WHERE id=?`).bind(i,nowIso(),id)));
+      return json({ok:true,items:await getBuyZoneData(env)});
+    }
     if(request.method==='PUT'){
       let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
       await replaceBuyZoneData(env,b.items);
