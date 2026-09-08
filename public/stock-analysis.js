@@ -125,7 +125,7 @@
 
   function boolState(v){return v?'Bullish':'Bearish';}
   function techCell(label,value,status,type='neutral'){
-    return `<div class="tech-item tech-${type}"><div class="tech-label">${esc(label)}</div><div class="tech-value">${esc(value)}</div><span class="tech-tag">${esc(status)}</span></div>`;
+    return `<td class="indicator-cell"><div class="tech-item tech-${type}"><div class="tech-label">${esc(label)}</div><div class="tech-value">${esc(value)}</div><span class="tech-tag">${esc(status)}</span></div></td>`;
   }
 
   async function api(path, options={}){
@@ -184,15 +184,32 @@
     if(stocks.length>=MAX_STOCKS){setStatus('Maximum 15 stocks reached.',true);return;}
     const symbol=String(item.symbol||'').trim().toUpperCase().replace(/\.NS$/i,''); if(!symbol)return;
     if(stocks.some(x=>x.symbol===symbol)){setStatus(`${symbol} is already added.`,true);return;}
-    const entry={symbol,name:item.name||symbol,loading:true}; stocks.push(entry); render(); setStatus(`Analysing ${symbol}…`);
+
+    // Save the stock to D1 first. A temporary market-data failure must never
+    // make an otherwise valid stock disappear from the user's Buy Zone list.
+    const entry={symbol,name:item.name||symbol,loading:true};
+    stocks.push(entry); render(); setStatus(`Saving ${symbol}…`);
     try{
-      const [stock,peers] = await Promise.all([api(`/api/stock?symbol=${encodeURIComponent(symbol)}`), api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))]);
-      entry.data=stock; entry.peers=peers; entry.loading=false; entry.analysis=buildAnalysis(entry);
       await saveStocks();
+    }catch(e){
+      const idx=stocks.indexOf(entry); if(idx>=0)stocks.splice(idx,1);
+      render(); setStatus(`${symbol}: ${e.message||'Unable to save to database'}`,true); return;
+    }
+
+    setStatus(`Analysing ${symbol}…`);
+    try{
+      const [stock,peers] = await Promise.all([
+        api(`/api/stock?symbol=${encodeURIComponent(symbol)}`),
+        api(`/api/peers?symbol=${encodeURIComponent(symbol)}`).catch(()=>({}))
+      ]);
+      entry.data=stock; entry.peers=peers; entry.loading=false; entry.analysis=buildAnalysis(entry); delete entry.refreshError;
       lastUpdated=new Date(); $('lastUpdated').textContent=fmtTime();
       render(); setStatus(`${symbol} added and saved to database.`);
     }catch(e){
-      const idx=stocks.indexOf(entry);if(idx>=0)stocks.splice(idx,1);render();setStatus(`${symbol}: ${e.message||'Unable to analyse/save'}`,true);
+      entry.loading=false;
+      entry.refreshError=e.message||'Market data temporarily unavailable';
+      render();
+      setStatus(`${symbol} saved to database, but analysis is temporarily unavailable. Use Refresh to retry.`,true);
     }
   }
 
