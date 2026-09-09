@@ -183,37 +183,17 @@ async function fetchMarketStats(){
     return d;
   }catch(e){return null;}
 }
-function formatMarketVolume(v){
-  if(v==null||!Number.isFinite(Number(v)))return '--';
-  const n=Number(v);
-  if(n>=1e7)return `${(n/1e7).toFixed(2)} Cr`;
-  if(n>=1e5)return `${(n/1e5).toFixed(2)} L`;
-  if(n>=1e3)return `${(n/1e3).toFixed(1)}K`;
-  return Math.round(n).toLocaleString('en-IN');
-}
-function renderMarketList(items,key='gainers'){
+function renderMarketList(items){
   const box=document.getElementById('marketMoverList');
   if(!box)return;
   if(!Array.isArray(items)||!items.length){box.innerHTML='<div class="market-empty">No market data available</div>';return;}
-  box.innerHTML=items.slice(0,8).map((x,i)=>{
-    if(key==='volume'){
-      return `<div class="market-mover-row volume-shocker-row">
-        <span class="market-rank">${i+1}</span>
-        <span class="market-mover-name"><b>${escapeHtml(x.symbol||'--')}</b><small>${escapeHtml(x.name||'')}</small></span>
-        <span class="market-mover-value ${Number(x.changePercent)>=0?'up':'down'} volume-value">
-          <b>${x.price==null?'--':`${formatSummaryPrice(x.price)} ${x.changePercent==null?'':`${x.changePercent>=0?'+':''}${Number(x.changePercent).toFixed(2)}%`}`}</b>
-          <small>${formatMarketVolume(x.volume)}</small>
-        </span>
-      </div>`;
-    }
-    return `<div class="market-mover-row"><span class="market-rank">${i+1}</span><span class="market-mover-name"><b>${escapeHtml(x.symbol||'--')}</b><small>${escapeHtml(x.name||'')}</small></span><span class="market-mover-value ${x.changePercent<0?'down':'up'}">${x.changePercent==null?'--':`${x.changePercent>=0?'+':''}${Number(x.changePercent).toFixed(2)}%`}</span></div>`;
-  }).join('');
+  box.innerHTML=items.slice(0,8).map((x,i)=>`<div class="market-mover-row"><span class="market-rank">${i+1}</span><span class="market-mover-name"><b>${escapeHtml(x.symbol||'--')}</b><small>${escapeHtml(x.name||'')}</small></span><span class="market-mover-value ${x.changePercent<0?'down':'up'}">${x.changePercent==null?'--':`${x.changePercent>=0?'+':''}${Number(x.changePercent).toFixed(2)}%`}</span></div>`).join('');
 }
 function setupMarketTabs(data){
   const tabs=[...document.querySelectorAll('.market-tab')];
   if(!tabs.length)return;
-  const map={gainers:'gainers',losers:'losers',volume:'volume'};
-  const activate=key=>{tabs.forEach(t=>t.classList.toggle('active',t.dataset.marketTab===key));renderMarketList(data?.[map[key]]||[],key);};
+  const map={gainers:'gainers',losers:'losers',low52:'low52'};
+  const activate=key=>{tabs.forEach(t=>t.classList.toggle('active',t.dataset.marketTab===key));renderMarketList(data?.[map[key]]||[]);};
   tabs.forEach(t=>t.addEventListener('click',()=>activate(t.dataset.marketTab)));
   activate('gainers');
 }
