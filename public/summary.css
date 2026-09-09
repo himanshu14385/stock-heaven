@@ -52,3 +52,11 @@
 .market-empty{padding:25px 10px;text-align:center;color:#8993a4;font-size:10px}
 .peer-selected{background:#f6f9ff}.selected-badge{display:inline-block;margin-left:6px;font-size:8px;color:#416ee8;font-weight:800}
 @media(max-width:800px){.market-stat-columns{grid-template-columns:1fr}.market-mover-list{max-height:none}}
+
+
+/* MARKET MOVERS V2 */
+.market-mover-value{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:72px}
+.market-mover-value strong{font-size:10px;font-weight:800;color:#172033}
+.market-mover-value em{font-size:10px;font-style:normal;font-weight:800}
+.market-mover-value.up em{color:#159447}
+.market-mover-value.down em{color:#d84b4b}
