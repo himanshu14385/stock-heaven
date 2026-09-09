@@ -608,3 +608,49 @@ span.mystuckprice {
 .dnone {
     display: none !important;
 }
+/* Stuck Stock: today's movement beside name + total unrealized P/L below name */
+.stuck-name-wrap {
+    text-align: left;
+    align-items: flex-start;
+    row-gap: 4px;
+}
+
+.stuck-name-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.stuck-name-line .stuck-stock-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stuck-movement {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.stuck-movement.movement-up,
+.stuck-pnl.pnl-up {
+    color: #16a34a;
+}
+
+.stuck-movement.movement-down,
+.stuck-pnl.pnl-down {
+    color: #ef2b2d;
+}
+
+.stuck-pnl {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.stuck-row-right > .ssname-wrap {
+    text-align: right;
+    align-items: flex-end;
+}

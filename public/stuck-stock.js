@@ -118,13 +118,26 @@ function selectStuckAddStockByIndex(index) {
 
 async function getStuckStockPrice(symbol) {
     try {
-        const response = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
+        const response = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok || result.error) throw new Error("Price unavailable");
-        return Number(result.price);
+        return {
+            price: Number.isFinite(Number(result.price)) ? Number(result.price) : null,
+            change: Number.isFinite(Number(result.change)) ? Number(result.change) : null
+        };
     } catch (error) {
-        return null;
+        return { price: null, change: null };
     }
+}
+
+function parseStuckInfoForPL(info) {
+    const m = String(info || "").match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)\s*$/i);
+    return { quantity: m ? Number(m[1]) : 0, buyPrice: m ? Number(m[2]) : 0 };
+}
+
+function formatStuckNumber(value) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "--";
+    return Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function renderStuckStocks(animateFrom = null) {
@@ -134,15 +147,29 @@ function renderStuckStocks(animateFrom = null) {
 
     const visibleStocks = stuckStocks.slice(0, 20);
     container.innerHTML = visibleStocks.map((stock, index) => {
-        const price = stuckPrices[String(stock.id ?? stock.symbol)] ?? null;
+        const quote = stuckPrices[String(stock.id ?? stock.symbol)] ?? { price: null, change: null };
+        const price = quote && typeof quote === "object" ? quote.price : quote;
+        const movement = quote && typeof quote === "object" ? quote.change : null;
+        const parsedInfo = parseStuckInfoForPL(stock.stuckInfo);
+        const pnl = price != null && parsedInfo.quantity > 0 && parsedInfo.buyPrice > 0
+            ? (price - parsedInfo.buyPrice) * parsedInfo.quantity
+            : null;
+        const movementClass = movement == null ? "" : (movement >= 0 ? "movement-up" : "movement-down");
+        const movementText = movement == null ? "--" : `${movement >= 0 ? "+" : ""}${formatStuckNumber(movement)}`;
+        const pnlClass = pnl == null ? "" : (pnl >= 0 ? "pnl-up" : "pnl-down");
+        const pnlText = pnl == null ? "--" : `${pnl >= 0 ? "+" : ""}${formatStuckNumber(pnl)}`;
         return `
         <div class="stuck-stock-row" draggable="true" data-stuck-index="${index}" data-stuck-id="${escapeStuckHtml(stock.id ?? '')}"
              onclick="showStuckQuote('${String(stock.symbol || '').replace(/'/g, "\\'")}')"
              ondragstart="dragStuck(event, ${index})" ondragover="allowStuckDrop(event)" ondrop="dropStuck(event, ${index})">
             <div class="handle_sssname_wrap">
                 <div class="stuck-drag-handle" title="Drag to reorder" aria-label="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
-                <div class="ssname-wrap">
-                    <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
+                <div class="ssname-wrap stuck-name-wrap">
+                    <div class="stuck-name-line">
+                        <span class="stuck-stock-name">${escapeStuckHtml(stock.name)}</span>
+                        <span class="stuck-movement ${movementClass}">${movementText}</span>
+                    </div>
+                    <span class="stuck-pnl ${pnlClass}">${pnlText}</span>
                     <span class="mystuckprice dnone">${escapeStuckHtml(stock.stuckInfo)}</span>
                 </div>
             </div>
@@ -203,13 +230,14 @@ async function loadStuckStocks() {
 
     const results = await Promise.all(
         stuckStocks.slice(0, 20).map(async stock => {
-            const price = await getStuckStockPrice(stock.symbol);
-            return { id: stock.id, symbol: stock.symbol, price };
+            const quote = await getStuckStockPrice(stock.symbol);
+            return { id: stock.id, symbol: stock.symbol, ...quote };
         })
     );
 
     results.forEach(item => {
-        stuckPrices[String(item.id ?? item.symbol)] = item.price;
+        const key = String(item.id ?? item.symbol);
+        stuckPrices[key] = { price: item.price, change: item.change };
     });
 
     renderStuckStocks();
