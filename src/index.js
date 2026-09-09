@@ -155,50 +155,22 @@ async function fetchYahooScreener(scrId) {
     return body?.finance?.result?.[0]?.quotes || [];
   } catch (_) { return []; }
 }
-
-async function fetchNseIndexStocks(indexName = "NIFTY 500") {
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
-    "Accept": "application/json,text/plain,*/*",
-    "Accept-Language": "en-IN,en;q=0.9",
-    "Referer": "https://www.nseindia.com/"
-  };
-  try {
-    const home = await fetch("https://www.nseindia.com/", { headers });
-    const setCookie = home.headers.get("set-cookie") || "";
-    const cookie = setCookie
-      .split(/,(?=[^;=,]+=[^;]+)/)
-      .map(x => x.split(";")[0].trim())
-      .filter(Boolean)
-      .join("; ");
-    const api = `https://www.nseindia.com/api/equity-stockIndices?index=${encodeURIComponent(indexName)}`;
-    const r = await fetch(api, {
-      headers: { ...headers, ...(cookie ? { "Cookie": cookie } : {}) }
-    });
-    if (!r.ok) return [];
-    const body = await r.json();
-    return Array.isArray(body?.data) ? body.data.filter(x => Number(x?.priority) === 0 && x?.symbol) : [];
-  } catch (_) {
-    return [];
-  }
-}
-
 function marketQuote(q) {
   const symbol = String(q.symbol || "").toUpperCase();
-  if (!symbol) return null;
-  const price = Number(q.lastPrice ?? q.regularMarketPrice);
-  const changePercent = Number(q.pChange ?? q.regularMarketChangePercent);
-  const volume = Number(q.totalTradedVolume ?? q.regularMarketVolume);
+  if (!symbol.endsWith(".NS")) return null;
+  const name = q.longName || q.shortName || symbol.replace(/\.NS$/i, "");
+  const price = Number(q.regularMarketPrice);
+  const changePercent = Number(q.regularMarketChangePercent);
   return {
     symbol: symbol.replace(/\.NS$/i, ""),
-    name: q.companyName || q.longName || q.shortName || symbol.replace(/\.NS$/i, ""),
+    name,
     price: Number.isFinite(price) ? price : null,
     changePercent: Number.isFinite(changePercent) ? changePercent : null,
-    volume: Number.isFinite(volume) ? volume : null,
-    distanceFrom52Low: Number.isFinite(Number(q.yearLow)) && Number.isFinite(price) && Number(q.yearLow) > 0
-      ? ((price - Number(q.yearLow)) / Number(q.yearLow)) * 100 : null
+    distanceFrom52Low: Number.isFinite(Number(q.fiftyTwoWeekLow)) && Number.isFinite(price) && Number(q.fiftyTwoWeekLow) > 0
+      ? ((price - Number(q.fiftyTwoWeekLow)) / Number(q.fiftyTwoWeekLow)) * 100 : null
   };
 }
+
 
 async function fetchYahooLiveQuote(symbol) {
   const clean = String(symbol || '').trim().toUpperCase().replace(/\.NS$/i, '');
@@ -850,76 +822,21 @@ export default {
 
     if (url.pathname === "/api/market-stats") {
       try {
-        // Primary source for this dashboard: Moneycontrol's public NSE market-stat pages.
-        // NSE's API can reject Cloudflare Worker requests, so keep NSE as a fallback only.
-        const parseMoneycontrolRows = (html, mode) => {
-          const rows = [...String(html || "").matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(m => m[1]);
-          const out = [];
-          for (const row of rows) {
-            const cells = [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m => stripTags(m[1]).replace(/\s+/g, " ").trim());
-            if (cells.length < 2) continue;
-            const name = cells[0]
-              .replace(/Add to Watchlist/gi, "")
-              .replace(/Portfolio/gi, "")
-              .replace(/ACTIONS?/gi, "")
-              .replace(/Analysis/gi, "")
-              .trim();
-            if (!name || /^(Company Name|Stock Name|Company)$/i.test(name)) continue;
-
-            const firstData = cells.find((c, i) => i > 0 && /[-+]?\d[\d,]*(?:\.\d+)?\s+[-+]?\d[\d,]*(?:\.\d+)?\s*\([-+]?\d+(?:\.\d+)?%\)/.test(c));
-            if (!firstData) continue;
-            const m = firstData.match(/([-+]?\d[\d,]*(?:\.\d+)?)\s+[-+]?\d[\d,]*(?:\.\d+)?\s*\(([-+]?\d+(?:\.\d+)?)%\)/);
-            if (!m) continue;
-            const price = num(m[1]);
-            const changePercent = num(m[2]);
-            if (price == null || changePercent == null) continue;
-
-            let volume = null;
-            if (mode === "volume") {
-              // Current Moneycontrol NSE volume-shocker table is:
-              // Stock | Price/Change | Day High | Day Low | Volume | Open | Analysis
-              for (const idx of [4, 5, 6, 7]) {
-                const c = String(cells[idx] || "").replace(/,/g, "").trim();
-                if (/^\d+(?:\.\d+)?$/.test(c)) {
-                  const n = Number(c);
-                  if (Number.isFinite(n) && n >= 1000) { volume = n; break; }
-                }
-              }
-            }
-            out.push({ symbol: name, name: "", price, changePercent, volume });
-            if (out.length >= 30) break;
-          }
-          return out;
-        };
-
-        const fetchMoneycontrol = async (path, mode) => {
-          try {
-            const html = await fetchText(`https://www.moneycontrol.com${path}`);
-            return parseMoneycontrolRows(html, mode);
-          } catch (_) { return []; }
-        };
-
-        const [gainers, losers, volume] = await Promise.all([
-          fetchMoneycontrol('/stocks/market-stats/top-gainers-nse/', 'mover'),
-          fetchMoneycontrol('/stocks/market-stats/top-losers-nse/', 'mover'),
-          fetchMoneycontrol('/stocks/market-stats/volume-shockers-nse/', 'volume')
+        const [gRaw, lRaw, lowRaw] = await Promise.all([
+          fetchYahooScreener("day_gainers"),
+          fetchYahooScreener("day_losers"),
+          fetchYahooScreener("52_week_lows")
         ]);
-
-        if (gainers.length || losers.length || volume.length) {
-          return json({
-            gainers: gainers.slice(0, 8),
-            losers: losers.slice(0, 8),
-            volume: volume.slice(0, 8)
-          });
+        const mapList = raw => raw.map(marketQuote).filter(Boolean);
+        const gainers = mapList(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
+        const losers = mapList(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
+        let low52 = mapList(lowRaw);
+        if (!low52.length) {
+          const alt = await fetchYahooScreener("fifty_two_wk_losers");
+          low52 = mapList(alt);
         }
-
-        // Fallback to the existing NSE feed if Moneycontrol is temporarily unavailable.
-        const raw = await fetchNseIndexStocks("NIFTY 500");
-        const all = raw.map(marketQuote).filter(Boolean).filter(x => x.price != null);
-        const fallbackGainers = all.filter(x => x.changePercent != null).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
-        const fallbackLosers = all.filter(x => x.changePercent != null).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
-        const fallbackVolume = all.filter(x => x.volume != null && x.volume > 0).sort((a,b)=>(b.volume??-1)-(a.volume??-1)).slice(0,8);
-        return json({ gainers: fallbackGainers, losers: fallbackLosers, volume: fallbackVolume });
+        low52 = low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999)).slice(0,8);
+        return json({ gainers, losers, low52 });
       } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
     }
 
