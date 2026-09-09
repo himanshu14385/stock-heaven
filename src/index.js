@@ -155,22 +155,50 @@ async function fetchYahooScreener(scrId) {
     return body?.finance?.result?.[0]?.quotes || [];
   } catch (_) { return []; }
 }
-function marketQuote(q) {
-  const symbol = String(q.symbol || "").toUpperCase();
-  if (!symbol.endsWith(".NS")) return null;
-  const name = q.longName || q.shortName || symbol.replace(/\.NS$/i, "");
-  const price = Number(q.regularMarketPrice);
-  const changePercent = Number(q.regularMarketChangePercent);
-  return {
-    symbol: symbol.replace(/\.NS$/i, ""),
-    name,
-    price: Number.isFinite(price) ? price : null,
-    changePercent: Number.isFinite(changePercent) ? changePercent : null,
-    distanceFrom52Low: Number.isFinite(Number(q.fiftyTwoWeekLow)) && Number.isFinite(price) && Number(q.fiftyTwoWeekLow) > 0
-      ? ((price - Number(q.fiftyTwoWeekLow)) / Number(q.fiftyTwoWeekLow)) * 100 : null
+
+async function fetchNseIndexStocks(indexName = "NIFTY 500") {
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "en-IN,en;q=0.9",
+    "Referer": "https://www.nseindia.com/"
   };
+  try {
+    const home = await fetch("https://www.nseindia.com/", { headers });
+    const setCookie = home.headers.get("set-cookie") || "";
+    const cookie = setCookie
+      .split(/,(?=[^;=,]+=[^;]+)/)
+      .map(x => x.split(";")[0].trim())
+      .filter(Boolean)
+      .join("; ");
+    const api = `https://www.nseindia.com/api/equity-stockIndices?index=${encodeURIComponent(indexName)}`;
+    const r = await fetch(api, {
+      headers: { ...headers, ...(cookie ? { "Cookie": cookie } : {}) }
+    });
+    if (!r.ok) return [];
+    const body = await r.json();
+    return Array.isArray(body?.data) ? body.data.filter(x => Number(x?.priority) === 0 && x?.symbol) : [];
+  } catch (_) {
+    return [];
+  }
 }
 
+function marketQuote(q) {
+  const symbol = String(q.symbol || "").toUpperCase();
+  if (!symbol) return null;
+  const price = Number(q.lastPrice ?? q.regularMarketPrice);
+  const changePercent = Number(q.pChange ?? q.regularMarketChangePercent);
+  const volume = Number(q.totalTradedVolume ?? q.regularMarketVolume);
+  return {
+    symbol: symbol.replace(/\.NS$/i, ""),
+    name: q.companyName || q.longName || q.shortName || symbol.replace(/\.NS$/i, ""),
+    price: Number.isFinite(price) ? price : null,
+    changePercent: Number.isFinite(changePercent) ? changePercent : null,
+    volume: Number.isFinite(volume) ? volume : null,
+    distanceFrom52Low: Number.isFinite(Number(q.yearLow)) && Number.isFinite(price) && Number(q.yearLow) > 0
+      ? ((price - Number(q.yearLow)) / Number(q.yearLow)) * 100 : null
+  };
+}
 
 async function fetchYahooLiveQuote(symbol) {
   const clean = String(symbol || '').trim().toUpperCase().replace(/\.NS$/i, '');
@@ -822,21 +850,23 @@ export default {
 
     if (url.pathname === "/api/market-stats") {
       try {
-        const [gRaw, lRaw, lowRaw] = await Promise.all([
-          fetchYahooScreener("day_gainers"),
-          fetchYahooScreener("day_losers"),
-          fetchYahooScreener("52_week_lows")
-        ]);
-        const mapList = raw => raw.map(marketQuote).filter(Boolean);
-        const gainers = mapList(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
-        const losers = mapList(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
-        let low52 = mapList(lowRaw);
-        if (!low52.length) {
-          const alt = await fetchYahooScreener("fifty_two_wk_losers");
-          low52 = mapList(alt);
-        }
-        low52 = low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999)).slice(0,8);
-        return json({ gainers, losers, low52 });
+        // Yahoo's predefined day_gainers/day_losers screens are US-oriented.
+        // For the Indian dashboard, use NSE's NIFTY 500 live constituent feed.
+        const raw = await fetchNseIndexStocks("NIFTY 500");
+        const all = raw.map(marketQuote).filter(Boolean).filter(x => x.price != null);
+        const gainers = all
+          .filter(x => x.changePercent != null)
+          .sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999))
+          .slice(0,8);
+        const losers = all
+          .filter(x => x.changePercent != null)
+          .sort((a,b)=>(a.changePercent??999)-(b.changePercent??999))
+          .slice(0,8);
+        const volume = all
+          .filter(x => x.volume != null && x.volume > 0)
+          .sort((a,b)=>(b.volume??-1)-(a.volume??-1))
+          .slice(0,8);
+        return json({ gainers, losers, volume });
       } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
     }
 
