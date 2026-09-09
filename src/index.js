@@ -146,6 +146,64 @@ async function fetchSelectedMetrics(symbol, fallbackName) {
   return { symbol: clean, name: fallbackName || clean, pe };
 }
 
+async function fetchTradingViewMover(sortBy, sortOrder = "desc") {
+  const body = {
+    markets: ["india"],
+    symbols: { query: { types: [] }, tickers: [] },
+    options: { lang: "en" },
+    columns: ["name", "description", "close", "change", "change_abs", "volume"],
+    filter: [
+      { left: "is_primary", operation: "equal", right: true },
+      { left: "type", operation: "equal", right: "stock" }
+    ],
+    sort: { sortBy, sortOrder, nullsFirst: false },
+    range: [0, 8],
+    ignore_unknown_fields: true
+  };
+  try {
+    const r = await fetch("https://scanner.tradingview.com/india/scan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json,text/plain,*/*",
+        "User-Agent": "Mozilla/5.0"
+      },
+      body: JSON.stringify(body),
+      cache: "no-store"
+    });
+    if (!r.ok) return [];
+    const payload = await r.json();
+    const columns = body.columns;
+    return (Array.isArray(payload?.data) ? payload.data : []).map(row => {
+      const values = Array.isArray(row?.d) ? row.d : [];
+      const get = key => values[columns.indexOf(key)];
+      const rawSymbol = String(row?.s || "").toUpperCase();
+      const symbol = rawSymbol.replace(/^NSE:/, "");
+      const price = Number(get("close"));
+      const changePercent = Number(get("change"));
+      const changeAbs = Number(get("change_abs"));
+      const volume = Number(get("volume"));
+      return {
+        symbol,
+        name: String(get("description") || get("name") || symbol),
+        price: Number.isFinite(price) ? price : null,
+        changePercent: Number.isFinite(changePercent) ? changePercent : null,
+        change: Number.isFinite(changeAbs) ? changeAbs : null,
+        volume: Number.isFinite(volume) ? volume : null
+      };
+    }).filter(x => x.symbol && x.price != null);
+  } catch (_) { return []; }
+}
+
+async function fetchTradingViewMovers() {
+  const [gainers, losers, volume] = await Promise.all([
+    fetchTradingViewMover("change", "desc"),
+    fetchTradingViewMover("change", "asc"),
+    fetchTradingViewMover("volume", "desc")
+  ]);
+  return { gainers, losers, volume };
+}
+
 async function fetchYahooScreener(scrId) {
   const u = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?count=50&scrIds=${encodeURIComponent(scrId)}&region=IN&lang=en-IN`;
   try {
@@ -822,21 +880,25 @@ export default {
 
     if (url.pathname === "/api/market-stats") {
       try {
-        const [gRaw, lRaw, lowRaw] = await Promise.all([
+        // Yahoo's predefined day_gainers/day_losers screens are US-market
+        // screeners even when region=IN is passed, so filtering them for .NS
+        // symbols can legitimately produce an empty list. Use TradingView's
+        // India stock scanner for the actual Indian-market movers.
+        const tv = await fetchTradingViewMovers();
+        if (tv.gainers.length || tv.losers.length || tv.volume.length) {
+          return json({ ...tv, source: "TradingView India market scanner" });
+        }
+
+        // Keep the old Yahoo route as a last-resort fallback so the endpoint
+        // still degrades gracefully if the primary scanner is unavailable.
+        const [gRaw, lRaw] = await Promise.all([
           fetchYahooScreener("day_gainers"),
-          fetchYahooScreener("day_losers"),
-          fetchYahooScreener("52_week_lows")
+          fetchYahooScreener("day_losers")
         ]);
         const mapList = raw => raw.map(marketQuote).filter(Boolean);
         const gainers = mapList(gRaw).sort((a,b)=>(b.changePercent??-999)-(a.changePercent??-999)).slice(0,8);
         const losers = mapList(lRaw).sort((a,b)=>(a.changePercent??999)-(b.changePercent??999)).slice(0,8);
-        let low52 = mapList(lowRaw);
-        if (!low52.length) {
-          const alt = await fetchYahooScreener("fifty_two_wk_losers");
-          low52 = mapList(alt);
-        }
-        low52 = low52.sort((a,b)=>(a.distanceFrom52Low??999)-(b.distanceFrom52Low??999)).slice(0,8);
-        return json({ gainers, losers, low52 });
+        return json({ gainers, losers, volume: [], source: "Yahoo fallback" });
       } catch (_) { return json({ error: "Unable to fetch market statistics" }, 502); }
     }
 
