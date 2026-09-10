@@ -1,4 +1,4 @@
-let alertStocks=[], prices={}, timer=null, editingAlerts=new Set();
+let alertStocks=[], prices={}, timer=null, editingAlerts=new Set(), draggingAlert=null;
 
 async function loadAlertData(){
  try{const r=await fetch('/api/data/alerts',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load');alertStocks=Array.isArray(d.items)?d.items:[];}catch(e){alertStocks=[];alert('Alert data load nahi ho paya.');}
@@ -39,7 +39,8 @@ function render(){
   const hit=st==="hit";
   const diff=Number.isFinite(market)&&Number.isFinite(target)?market-target:null;
   const logo=initials(s.name||s.symbol);
-  return `<div class="alert-row ${hit?"triggered":""}">
+  return `<div class="alert-row ${hit?"triggered":""}" draggable="true" data-alert-index="${i}" ondragstart="startAlertDrag(event,${i})" ondragover="allowAlertDrop(event)" ondrop="dropAlert(event,${i})" ondragend="endAlertDrag()">
+   <div class="reorder-col"><button type="button" class="alert-drag-handle" title="Drag to reorder" aria-label="Drag to reorder" onmousedown="if(window.requireAdmin&&!window.requireAdmin())return false"><i class="fa-solid fa-grip-vertical"></i></button></div>
    <div class="check-col"><input class="alert-check" type="checkbox"></div>
    <div>${i+1}</div>
    <div class="stock-cell"><div class="stock-logo">${esc(logo)}</div><div class="stock-meta"><b>${esc(s.name||s.symbol)}</b><small>${esc(s.symbol)}</small></div></div>
@@ -55,6 +56,50 @@ function render(){
   </div>`;
  }).join("");
 }
+function startAlertDrag(event,i){
+ if(window.requireAdmin && !window.requireAdmin()){event.preventDefault();return}
+ draggingAlert=alertStocks[i]||null;
+ if(!draggingAlert)return;
+ event.dataTransfer.effectAllowed="move";
+ event.dataTransfer.setData("text/plain",String(i));
+ requestAnimationFrame(()=>event.currentTarget.classList.add("alert-dragging"));
+}
+function allowAlertDrop(event){
+ if(!draggingAlert)return;
+ event.preventDefault();
+ event.dataTransfer.dropEffect="move";
+ const row=event.currentTarget;
+ document.querySelectorAll(".alert-row.alert-drag-over").forEach(x=>{if(x!==row)x.classList.remove("alert-drag-over")});
+ row.classList.add("alert-drag-over");
+}
+async function dropAlert(event,targetIndex){
+ event.preventDefault();
+ document.querySelectorAll(".alert-row.alert-drag-over").forEach(x=>x.classList.remove("alert-drag-over"));
+ if(!draggingAlert)return;
+ if(window.requireAdmin && !window.requireAdmin()){draggingAlert=null;return}
+ const sourceItem=draggingAlert;
+ const sourceIndex=alertStocks.indexOf(sourceItem);
+ if(sourceIndex<0){draggingAlert=null;return}
+ const targetItem=alertStocks[targetIndex];
+ if(!targetItem || targetItem===sourceItem){draggingAlert=null;return}
+ alertStocks.splice(sourceIndex,1);
+ const newTargetIndex=alertStocks.indexOf(targetItem);
+ alertStocks.splice(newTargetIndex<0?alertStocks.length:newTargetIndex,0,sourceItem);
+ editingAlerts.clear();
+ render();
+ try{await saveAlerts()}catch(e){
+  await loadAlertData();
+  render();
+  alert(e.message||"Reorder save failed");
+ }
+ draggingAlert=null;
+}
+function endAlertDrag(){
+ document.querySelectorAll(".alert-row.alert-drag-over").forEach(x=>x.classList.remove("alert-drag-over"));
+ document.querySelectorAll(".alert-row.alert-dragging").forEach(x=>x.classList.remove("alert-dragging"));
+ draggingAlert=null;
+}
+
 function setAlert(i,v){if(!window.requireAdmin())return;alertStocks[i].alertPrice=v;saveAlerts().catch(e=>alert(e.message||"Save failed"))}
 function editAlert(i){if(!window.requireAdmin())return;editingAlerts.clear();editingAlerts.add(i);render();requestAnimationFrame(()=>{const input=document.querySelector(`.alert-row .alert-input`);if(input){input.focus();input.select();}})}
 function saveAlertEdit(i){if(!window.requireAdmin())return;
