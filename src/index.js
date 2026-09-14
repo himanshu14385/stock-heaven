@@ -431,7 +431,7 @@ async function fetchDynamicPeers(symbol) {
 }
 
 
-const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html","admin.html"]);
+const AUTH_PAGES = new Set(["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","low-price.html","stock-analysis.html","admin.html"]);
 const PROTECTED_PAGE_ALIASES = {
   "/": "index.html",
   "/index.html": "index.html",
@@ -441,6 +441,7 @@ const PROTECTED_PAGE_ALIASES = {
   "/fav-stock.html": "fav-stock.html",
   "/movement-catch.html": "movement-catch.html",
   "/crypto.html": "crypto.html",
+  "/low-price.html": "low-price.html",
   "/stock-analysis.html": "stock-analysis.html",
   "/admin.html": "admin.html"
 };
@@ -479,7 +480,7 @@ async function authInit(env){
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
   // Do NOT create a default Guest account. The single Guest credential must be
   // explicitly provisioned through the Admin panel / D1.
-  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html"]){
+  for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","low-price.html","stock-analysis.html"]){
     await db.prepare(`INSERT OR IGNORE INTO auth_restrictions(page,restricted,updated_at) VALUES (?,0,?)`).bind(page,nowIso()).run();
   }
 }
@@ -556,7 +557,7 @@ async function authJson(request,env,url){
   if(url.pathname==='/api/admin/restrictions'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
     if(request.method==='GET'){const rows=await env.AUTH_DB.prepare(`SELECT page,restricted FROM auth_restrictions`).all();const restrictions={};for(const r of rows.results||[])restrictions[r.page]=!!r.restricted;return json({restrictions});}
-    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","stock-analysis.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
+    if(request.method==='POST'){let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const r=b.restrictions||{};for(const page of ["index.html","stuck-stock.html","summary.html","alert.html","fav-stock.html","movement-catch.html","crypto.html","low-price.html","stock-analysis.html"]){await env.AUTH_DB.prepare(`INSERT INTO auth_restrictions(page,restricted,updated_at) VALUES (?,?,?) ON CONFLICT(page) DO UPDATE SET restricted=excluded.restricted,updated_at=excluded.updated_at`).bind(page,r[page]?1:0,nowIso()).run();}return json({ok:true});}
   }
   if(url.pathname==='/api/admin/login-log'){
     if(!await requireAdmin(request,env))return json({error:"Admin only"},403);
@@ -664,6 +665,19 @@ async function replaceFavoritesData(env,groups){
   if(ins.length)await env.AUTH_DB.batch(ins);
 }
 
+
+async function getLowPriceData(env){
+  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS low_price_watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT,symbol TEXT NOT NULL UNIQUE,name TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,added_at TEXT NOT NULL)`).run();
+  const rows=await env.AUTH_DB.prepare(`SELECT id,symbol,name,sort_order,added_at FROM low_price_watchlist ORDER BY sort_order,id`).all();
+  return rows.results||[];
+}
+async function replaceLowPriceData(env,items){
+  await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS low_price_watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT,symbol TEXT NOT NULL UNIQUE,name TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,added_at TEXT NOT NULL)`).run();
+  const clean=[]; const seen=new Set();
+  for(const x of Array.isArray(items)?items:[]){const symbol=String(x.symbol||'').trim().toUpperCase();if(!symbol||seen.has(symbol))continue;seen.add(symbol);clean.push({symbol,name:String(x.name||symbol).trim()});}
+  await env.AUTH_DB.prepare(`DELETE FROM low_price_watchlist`).run();
+  if(clean.length) await env.AUTH_DB.batch(clean.map((x,i)=>env.AUTH_DB.prepare(`INSERT INTO low_price_watchlist(symbol,name,sort_order,added_at) VALUES (?,?,?,?)`).bind(x.symbol,x.name,i,nowIso())));
+}
 async function getCryptoData(env){
   await env.AUTH_DB.prepare(`CREATE TABLE IF NOT EXISTS crypto_watchlist (id INTEGER PRIMARY KEY AUTOINCREMENT,market TEXT NOT NULL UNIQUE,symbol TEXT NOT NULL,name TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,added_at TEXT NOT NULL)`).run();
   const rows=await env.AUTH_DB.prepare(`SELECT id,market,symbol,name,sort_order,added_at FROM crypto_watchlist ORDER BY sort_order,id`).all();
@@ -761,6 +775,12 @@ async function dataJson(request,env,url){
     if(!admin)return json({error:'Admin only'},403);
     if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceAlertsData(env,b.items);return json({ok:true,items:await getAlertsData(env)});}
   }
+  if(url.pathname==='/api/data/low-price'){
+    if(request.method==='GET')return json({items:await getLowPriceData(env)});
+    if(!admin)return json({error:'Admin only'},403);
+    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceLowPriceData(env,b.items);return json({ok:true,items:await getLowPriceData(env)});}
+  }
+
   if(url.pathname==='/api/data/crypto'){
     if(request.method==='GET')return json({items:await getCryptoData(env)});
     if(!admin)return json({error:'Admin only'},403);
@@ -805,7 +825,7 @@ export default {
       }
     }
 
-    if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe","/api/crypto/markets","/api/crypto/ticker"].includes(url.pathname)) {
+    if (["/api/search","/api/market-stats","/api/stock","/api/peers","/api/pe","/api/crypto/markets","/api/crypto/ticker","/api/low-price/search","/api/low-price/history"].includes(url.pathname)) {
       const s = await currentAuth(request, env);
       if (!s) return json({error:"Authentication required"},401);
     }
@@ -830,6 +850,50 @@ export default {
           .sort((a,b)=>a.symbol.localeCompare(b.symbol));
         return json({ results });
       } catch (_) { return json({ error: "Unable to search crypto markets" }, 502); }
+    }
+
+    if (url.pathname === "/api/low-price/search") {
+      const q=(url.searchParams.get("q")||"").trim();
+      if(!q)return json({results:[]});
+      try{
+        const r=await fetch(`https://www.screener.in/api/company/search/?q=${encodeURIComponent(q)}`,{headers:{...HEADERS,Referer:"https://www.screener.in/"},cache:"no-store"});
+        if(!r.ok)return json({error:"Stock search failed"},502);
+        const items=await r.json();
+        const results=(Array.isArray(items)?items:[]).map(item=>{const m=String(item.url||"").match(/\/company\/([^/]+)\//);return m?{symbol:m[1].toUpperCase(),name:String(item.name||item.title||m[1]).trim()}:null}).filter(Boolean).slice(0,10);
+        return json({results});
+      }catch(_){return json({error:"Unable to search stocks"},502)}
+    }
+
+    if (url.pathname === "/api/low-price/history") {
+      const symbol=(url.searchParams.get("symbol")||"").trim().toUpperCase().replace(/\.NS$/,'');
+      if(!symbol)return json({error:"Stock symbol missing"},400);
+      const yahoo=`${symbol}.NS`;
+      try{
+        const period2=Math.floor(Date.now()/1000);
+        const period1=period2-45*86400;
+        const u=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahoo)}?period1=${period1}&period2=${period2}&interval=1d&events=div%2Csplits`;
+        const r=await fetch(u,{headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json,text/plain,*/*"},cache:"no-store"});
+        if(!r.ok)return json({error:"Historical data unavailable"},502);
+        const body=await r.json(); const result=body?.chart?.result?.[0];
+        if(!result)return json({error:"Historical data unavailable"},502);
+        const ts=result.timestamp||[]; const q=result.indicators?.quote?.[0]||{};
+        const rows=[];
+        for(let i=0;i<ts.length;i++){
+          const low=Number(q.low?.[i]),close=Number(q.close?.[i]);
+          if(!Number.isFinite(low)||!Number.isFinite(close))continue;
+          const d=new Date(ts[i]*1000); const date=d.toISOString().slice(0,10);
+          rows.push({date,low,previous_close:null});
+        }
+        for(let i=0;i<rows.length;i++) rows[i].previous_close=i>0?rows[i-1].close_for_prev:null;
+        // Rebuild previous close from daily closes, preserving only requested fields.
+        const out=[]; let prev=null;
+        for(let i=0;i<ts.length;i++){
+          const low=Number(q.low?.[i]),close=Number(q.close?.[i]);
+          if(!Number.isFinite(low)||!Number.isFinite(close))continue;
+          out.push({date:new Date(ts[i]*1000).toISOString().slice(0,10),low,previous_close:prev}); prev=close;
+        }
+        return json({symbol,results:out.slice(-30).reverse()});
+      }catch(_){return json({error:"Unable to fetch historical data"},502)}
     }
 
     if (url.pathname === "/api/crypto/ticker") {
