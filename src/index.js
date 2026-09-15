@@ -768,25 +768,39 @@ async function dataJson(request,env,url){
   if(url.pathname==='/api/data/stuck'){
     if(request.method==='GET')return json({items:await getStuckData(env)});
     if(!admin)return json({error:'Admin only'},403);
-    if(request.method==='POST'){
+
+    if(request.method==='PATCH'){
       let b={};
-      try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
-      const symbol=String(b.symbol||'').trim().toUpperCase();
-      const name=String(b.name||symbol).trim();
-      const quantity=Number(b.quantity);
-      const buyPrice=Number(b.buyPrice);
-      if(!symbol)return json({error:'Stock symbol is required'},400);
-      if(!Number.isFinite(quantity)||quantity<=0)return json({error:'Valid quantity is required'},400);
-      if(!Number.isFinite(buyPrice)||buyPrice<=0)return json({error:'Valid buy price is required'},400);
-      const existing=await env.AUTH_DB.prepare(`SELECT id FROM stuck_stocks WHERE UPPER(symbol)=?`).bind(symbol).first();
-      if(existing)return json({error:`${symbol} is already added.`},409);
-      const maxRow=await env.AUTH_DB.prepare(`SELECT COALESCE(MAX(sort_order),-1) AS max_order FROM stuck_stocks`).first();
-      const sortOrder=Number(maxRow?.max_order ?? -1)+1;
-      const result=await env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,name,quantity,buyPrice,sortOrder).run();
-      const item=await env.AUTH_DB.prepare(`SELECT id,symbol,name,quantity,buy_price,sort_order FROM stuck_stocks WHERE id=?`).bind(result.meta?.last_row_id).first();
-      return json({ok:true,item,items:await getStuckData(env)});
+      try{b=await request.json()}catch(_){return json({error:'Invalid request'},400);}
+      const order=Array.isArray(b.order)?b.order.map(Number):[];
+      const current=await env.AUTH_DB.prepare(`SELECT id FROM stuck_stocks ORDER BY sort_order,id`).all();
+      const existing=(current.results||[]).map(r=>Number(r.id));
+
+      if(
+        order.length!==existing.length ||
+        new Set(order).size!==existing.length ||
+        order.some(id=>!existing.includes(id))
+      ){
+        return json({error:'Invalid stock order'},400);
+      }
+
+      if(order.length){
+        await env.AUTH_DB.batch(
+          order.map((id,i)=>
+            env.AUTH_DB.prepare(`UPDATE stuck_stocks SET sort_order=? WHERE id=?`).bind(i,id)
+          )
+        );
+      }
+
+      return json({ok:true,items:await getStuckData(env)});
     }
-    if(request.method==='PUT'){let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)};await replaceStuckData(env,b.items);return json({ok:true,items:await getStuckData(env)});}
+
+    if(request.method==='PUT'){
+      let b={};
+      try{b=await request.json()}catch(_){return json({error:'Invalid request'},400);}
+      await replaceStuckData(env,b.items);
+      return json({ok:true,items:await getStuckData(env)});
+    }
   }
   if(url.pathname==='/api/data/alerts'){
     if(request.method==='GET')return json({items:await getAlertsData(env)});
