@@ -2,10 +2,10 @@
 
 .low-search-wrap .suggestions .suggestion{display:flex;align-items:center;gap:10px;padding:11px 13px;background:#fff;border-bottom:1px solid #edf0f5;cursor:pointer;transition:.12s}.low-search-wrap .suggestions .suggestion:last-child{border-bottom:0}.low-search-wrap .suggestions .suggestion:hover{background:#f7faff}.low-suggestion-icon{width:32px;height:32px;flex:0 0 32px;border-radius:9px;border:1px solid #dfe7f2;background:#f4f8ff;display:grid!important;place-items:center;color:#1769ff;font-size:10px;font-weight:900}.low-search-wrap .suggestion-copy{min-width:0;flex:1}.low-search-wrap .suggestion-copy b{display:block;color:#17345f;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.low-search-wrap .suggestion-copy small{display:block;color:#8793a6;font-size:9px;margin-top:3px}.low-search-wrap .suggestion>i{color:#6f7f96;font-size:11px}.low-table td.best-low{background:#20a35a;color:#fff!important;font-weight:900}.low-table td.best-prev{background:#2474d8;color:#fff!important;font-weight:900}.low-table td.best-low,.low-table td.best-prev{border-bottom-color:rgba(255,255,255,.25)}
 
-.year-low{
+.year-low b{
 color:#f44336;	
 }
 
-.year-high{
+.year-high b{
 color:#009688;
 }
