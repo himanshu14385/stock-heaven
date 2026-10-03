@@ -475,6 +475,11 @@ async function authInit(env){
   // D1 schema is provisioned by schema.sql. Keep runtime initialization
   // lightweight and idempotent; do not run ALTER TABLE migrations per request.
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_settings (id INTEGER PRIMARY KEY CHECK (id=1),guest_username TEXT NOT NULL,guest_password_hash TEXT NOT NULL,guest_password_salt TEXT NOT NULL,guest_version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS guest_users (id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL COLLATE NOCASE UNIQUE,password_hash TEXT NOT NULL,password_salt TEXT NOT NULL,created_at TEXT NOT NULL)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS auth_migrations (migration_key TEXT PRIMARY KEY,applied_at TEXT NOT NULL)`).run();
+  // One-time migration of the old single Guest login. The marker prevents a deleted account from being recreated later.
+  await db.prepare(`INSERT OR IGNORE INTO guest_users (username,password_hash,password_salt,created_at) SELECT guest_username,guest_password_hash,guest_password_salt,updated_at FROM auth_settings WHERE id=1 AND NOT EXISTS (SELECT 1 FROM auth_migrations WHERE migration_key='single_guest_to_guest_users')`).run();
+  await db.prepare(`INSERT OR IGNORE INTO auth_migrations (migration_key,applied_at) VALUES ('single_guest_to_guest_users',?)`).bind(nowIso()).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT,token_hash TEXT NOT NULL UNIQUE,role TEXT NOT NULL CHECK(role IN ('admin','guest')),username TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_restrictions (page TEXT PRIMARY KEY,restricted INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS auth_login_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,role TEXT NOT NULL,username TEXT NOT NULL,login_at TEXT NOT NULL)`).run();
@@ -513,7 +518,7 @@ async function authJson(request,env,url){
     if(!username||!password)return json({error:"Username and password required"},400);
     let ok=false, loginUsername=username;
     if(role==='admin'){const c=adminCreds(env);ok=username===c.username&&password===c.password;}
-    else {const row=await env.AUTH_DB.prepare(`SELECT guest_username,guest_password_hash,guest_password_salt FROM auth_settings WHERE id=1`).first();ok=!!row&&username===row.guest_username&&await verifyPassword(password,row.guest_password_hash,row.guest_password_salt);loginUsername=row?.guest_username||username;}
+    else {const row=await env.AUTH_DB.prepare(`SELECT id,username,password_hash,password_salt FROM guest_users WHERE username=? COLLATE NOCASE`).bind(username).first();ok=!!row&&await verifyPassword(password,row.password_hash,row.password_salt);loginUsername=row?.username||username;}
     if(!ok)return json({error:"Invalid credentials"},401);
     const session=await createSession(env,role,loginUsername);
     await env.AUTH_DB.prepare(`INSERT INTO auth_login_logs(role,username,login_at) VALUES (?,?,?)`).bind(role,loginUsername,nowIso()).run();
@@ -542,9 +547,52 @@ async function authJson(request,env,url){
     const token=getCookie(request,"__Host-stock_heaven_session");if(token){await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE token_hash=?`).bind(await sha256(token)).run();}
     return new Response(JSON.stringify({ok:true}),{status:200,headers:new Headers({"Content-Type":"application/json","Cache-Control":"no-store","Set-Cookie":clearAuthCookie()})});
   }
+  if(url.pathname==='/api/admin/guest-users'){
+    if(!await requireAdmin(request,env))return json({error:'Admin only'},403);
+    if(request.method==='GET'){
+      const rows=await env.AUTH_DB.prepare(`SELECT id,username,created_at FROM guest_users ORDER BY id`).all();
+      return json({users:(rows.results||[]).map(x=>({id:x.id,username:x.username,createdAt:x.created_at}))});
+    }
+    if(request.method==='POST'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+      const username=String(b.username||'').trim(),password=String(b.password||'');
+      if(username.length<3||username.length>80||password.length<4||password.length>256)return json({error:'Username 3–80 aur password 4–256 characters ka hona chahiye.'},400);
+      const hp=await passwordHash(password);
+      try{
+        const result=await env.AUTH_DB.prepare(`INSERT INTO guest_users (username,password_hash,password_salt,created_at) VALUES (?,?,?,?)`).bind(username,hp.hash,hp.salt,nowIso()).run();
+        return json({ok:true,id:result.meta?.last_row_id,username});
+      }catch(e){if(String(e?.message||e).toLowerCase().includes('unique'))return json({error:'Ye username pehle se maujood hai.'},409);throw e;}
+    }
+  }
+  const guestDeleteMatch=url.pathname.match(/^\/api\/admin\/guest-users\/(\d+)$/);
+  if(guestDeleteMatch&&request.method==='DELETE'){
+    if(!await requireAdmin(request,env))return json({error:'Admin only'},403);
+    const id=Number(guestDeleteMatch[1]);
+    const user=await env.AUTH_DB.prepare(`SELECT username FROM guest_users WHERE id=?`).bind(id).first();
+    if(!user)return json({error:'Guest user not found'},404);
+    await env.AUTH_DB.batch([
+      env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest' AND username=?`).bind(user.username),
+      env.AUTH_DB.prepare(`DELETE FROM guest_users WHERE id=?`).bind(id)
+    ]);
+    return json({ok:true,id});
+  }
   if(url.pathname==='/api/admin/guest-credentials'){
-    if(request.method==='GET'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);const row=await env.AUTH_DB.prepare(`SELECT guest_username,guest_version,updated_at FROM auth_settings WHERE id=1`).first();return json({username:row.guest_username,version:row.guest_version,updatedAt:row.updated_at});}
-    if(request.method==='POST'){if(!await requireAdmin(request,env))return json({error:"Admin only"},403);let b={};try{b=await request.json()}catch(_){return json({error:"Invalid request"},400)}const u=String(b.username||'').trim(),p=String(b.password||'');if(u.length<3||p.length<4)return json({error:"Username min 3 and password min 4 characters"},400);const hp=await passwordHash(p);const old=await env.AUTH_DB.prepare(`SELECT guest_version FROM auth_settings WHERE id=1`).first();const version=Number(old?.guest_version||0)+1;if(old){await env.AUTH_DB.prepare(`UPDATE auth_settings SET guest_username=?,guest_password_hash=?,guest_password_salt=?,guest_version=?,updated_at=? WHERE id=1`).bind(u,hp.hash,hp.salt,version,nowIso()).run();}else{await env.AUTH_DB.prepare(`INSERT INTO auth_settings (id,guest_username,guest_password_hash,guest_password_salt,guest_version,updated_at) VALUES (1,?,?,?,?,?)`).bind(u,hp.hash,hp.salt,version,nowIso()).run();}await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest'`).run();return json({ok:true,username:u,version});}
+    if(!await requireAdmin(request,env))return json({error:'Admin only'},403);
+    if(request.method==='GET'){
+      const row=await env.AUTH_DB.prepare(`SELECT id,username,created_at FROM guest_users ORDER BY id LIMIT 1`).first();
+      return json({username:row?.username||'',version:1,updatedAt:row?.created_at||null});
+    }
+    if(request.method==='POST'){
+      let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+      const u=String(b.username||'').trim(),p=String(b.password||'');
+      if(u.length<3||p.length<4)return json({error:'Username min 3 and password min 4 characters'},400);
+      const hp=await passwordHash(p),old=await env.AUTH_DB.prepare(`SELECT id,username FROM guest_users ORDER BY id LIMIT 1`).first();
+      try{
+        if(old){await env.AUTH_DB.prepare(`UPDATE guest_users SET username=?,password_hash=?,password_salt=? WHERE id=?`).bind(u,hp.hash,hp.salt,old.id).run();await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest' AND username=?`).bind(old.username).run();}
+        else await env.AUTH_DB.prepare(`INSERT INTO guest_users (username,password_hash,password_salt,created_at) VALUES (?,?,?,?)`).bind(u,hp.hash,hp.salt,nowIso()).run();
+      }catch(e){if(String(e?.message||e).toLowerCase().includes('unique'))return json({error:'Ye username pehle se maujood hai.'},409);throw e;}
+      return json({ok:true,username:u});
+    }
   }
   if(url.pathname==='/api/auth/restrictions' && request.method==='GET'){
     const s=await currentAuth(request,env);
