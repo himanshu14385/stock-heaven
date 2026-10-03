@@ -41,6 +41,9 @@
   async function loginGuest(user,pass){return api('/api/auth/login',{method:'POST',body:JSON.stringify({role:'guest',username:user,password:pass})})}
   async function guestCredentials(){return api('/api/admin/guest-credentials')}
   async function saveGuestCredentials(username,password){return api('/api/admin/guest-credentials',{method:'POST',body:JSON.stringify({username,password})})}
+  async function guestUsers(){return api('/api/admin/guest-users')}
+  async function createGuestUser(username,password){return api('/api/admin/guest-users',{method:'POST',body:JSON.stringify({username,password})})}
+  async function deleteGuestUser(id){return api(`/api/admin/guest-users/${encodeURIComponent(id)}`,{method:'DELETE',body:'{}'})}
   async function getLoginLog(){const d=await api('/api/admin/login-log');return d.logs||[]}
   async function clearLoginLog(){return api('/api/admin/login-log',{method:'DELETE',body:'{}'})}
   async function getRestrictions(){const d=await api('/api/auth/restrictions');return d.restrictions||{}}
@@ -48,7 +51,7 @@
   function requireAdmin(){if(!isAdmin()){alert('Sirf Admin is action ko use kar sakta hai.');return false}return true}
 
   window.requireAdmin=requireAdmin;
-  window.StockHeavenAuth={session:()=>currentSession,role,isAdmin,isGuest,logout,loginAdmin,loginGuest,guestCredentials,saveGuestCredentials,getLoginLog,clearLoginLog,restrictions:getRestrictions,saveRestrictions,ready,isPageAllowedForGuest:async file=>{const r=await getRestrictions();return !r[file]}};
+  window.StockHeavenAuth={session:()=>currentSession,role,isAdmin,isGuest,logout,loginAdmin,loginGuest,guestCredentials,saveGuestCredentials,guestUsers,createGuestUser,deleteGuestUser,getLoginLog,clearLoginLog,restrictions:getRestrictions,saveRestrictions,ready,isPageAllowedForGuest:async file=>{const r=await getRestrictions();return !r[file]}};
 
   function injectTopbar(){
     const header=document.querySelector('.top-header'); if(!header||document.querySelector('.auth-topbar')||!currentSession)return;

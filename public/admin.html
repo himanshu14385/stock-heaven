@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Admin Control • Stock Heaven</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-<link rel="stylesheet" href="auth.css"><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="admin-db.css">
+<link rel="stylesheet" href="auth.css"><link rel="stylesheet" href="admin.css">
 <script src="auth.js"></script>
 </head>
 <body>
@@ -23,20 +23,15 @@
     <div class="admin-overview-card"><span class="overview-icon green"><i class="fa-solid fa-user-shield"></i></span><div><b>Current Access</b><small>Administrator session</small></div><span class="overview-status"><i class="fa-solid fa-lock"></i> Secure</span></div>
   </section>
 
-  <section class="admin-card db-manager">
-    <div class="section-heading"><div><span class="section-kicker">DATA MANAGEMENT</span><h2><i class="fa-solid fa-table-list"></i> Database Manager</h2><p>Stuck Stock, Alerts aur Fav Stock ka data directly D1 se manage karein.</p></div><div class="section-badge"><span id="dbStatus" class="db-status loading">Connecting…</span><button class="db-refresh" type="button" onclick="location.reload()" title="Refresh database"><i class="fa-solid fa-rotate-right"></i></button></div></div>
-    <div class="db-tabs"><button class="db-tab active" data-db-tab="alerts"><i class="fa-solid fa-bell"></i><span>Alerts</span></button><button class="db-tab" data-db-tab="stuck"><i class="fa-solid fa-thumbtack"></i><span>Stuck Stock</span></button><button class="db-tab" data-db-tab="favorites"><i class="fa-solid fa-star"></i><span>Fav Stock</span></button></div>
-    <div id="dbManagerPanel"><div class="db-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading database…</div></div>
-  </section>
-
   <div class="admin-grid-two">
     <section class="admin-card">
       <div class="section-heading compact"><div><span class="section-kicker">GUEST ACCESS</span><h2><i class="fa-solid fa-sliders"></i> Page Restrictions</h2><p>Restricted page Guest open nahi kar paayega.</p></div></div>
       <div id="restrictionList"></div><div id="saveNote" class="save-note"></div>
     </section>
-    <section class="admin-card">
-      <div class="section-heading compact"><div><span class="section-kicker">LOGIN SECURITY</span><h2><i class="fa-solid fa-key"></i> Guest Credentials</h2><p>Username/password change karte hi purane Guest sessions invalidate ho jayenge.</p></div></div>
-      <form id="guestCredForm" class="guest-cred-form"><div class="cred-grid"><div><label for="guestUsername">Guest Username</label><input id="guestUsername" required autocomplete="off"></div><div><label for="guestPassword">New Guest Password</label><input id="guestPassword" type="password" required autocomplete="new-password"></div></div><div class="cred-actions"><button type="submit" class="save-cred"><i class="fa-solid fa-floppy-disk"></i> Save Guest Login</button><span id="guestCredNote" class="save-note"></span></div></form>
+    <section class="admin-card guest-users-card">
+      <div class="section-heading compact"><div><span class="section-kicker">GUEST ACCESS</span><h2><i class="fa-solid fa-users"></i> Guest Users</h2><p>Guest accounts create karein, sabhi accounts dekhein aur zaroorat par delete karein.</p></div></div>
+      <form id="guestUserForm" class="guest-cred-form"><div class="cred-grid"><div><label for="guestUsername">Guest Username</label><input id="guestUsername" required minlength="3" autocomplete="off" placeholder="Enter username"></div><div><label for="guestPassword">Password</label><input id="guestPassword" type="password" required minlength="4" autocomplete="new-password" placeholder="Create password"></div></div><div class="cred-actions"><button type="submit" class="save-cred"><i class="fa-solid fa-user-plus"></i> Add Guest User</button><span id="guestUserNote" class="save-note" aria-live="polite"></span></div></form>
+      <div id="guestUsersList" class="guest-users-list"><div class="guest-users-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading guest users…</div></div>
     </section>
   </div>
 
