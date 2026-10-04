@@ -77,7 +77,13 @@
       document.querySelectorAll('a.nav-item[href]').forEach(link=>{
         const raw=(link.getAttribute('href')||'').split('#')[0];
         const file=raw.split('/').pop()||'index.html';
-        if(restrictions[file]){link.hidden=true;link.setAttribute('aria-hidden','true');}
+        if(restrictions[file]){
+          link.hidden=true;
+          link.setAttribute('aria-hidden','true');
+          // Force-hide even if the site's navigation CSS overrides the
+          // browser's default [hidden] display behavior.
+          link.style.setProperty('display','none','important');
+        }
       });
     }catch(_){/* Keep navigation intact if restriction lookup fails. */}
   }
