@@ -44,6 +44,7 @@
   async function guestUsers(){return api('/api/admin/guest-users')}
   async function createGuestUser(username,password){return api('/api/admin/guest-users',{method:'POST',body:JSON.stringify({username,password})})}
   async function deleteGuestUser(id){return api(`/api/admin/guest-users/${encodeURIComponent(id)}`,{method:'DELETE',body:'{}'})}
+  async function updateGuestPassword(id,password){return api(`/api/admin/guest-users/${encodeURIComponent(id)}/password`,{method:'POST',body:JSON.stringify({password})})}
   async function getLoginLog(){const d=await api('/api/admin/login-log');return d.logs||[]}
   async function clearLoginLog(){return api('/api/admin/login-log',{method:'DELETE',body:'{}'})}
   async function getRestrictions(){const d=await api('/api/auth/restrictions');return d.restrictions||{}}
@@ -51,7 +52,7 @@
   function requireAdmin(){if(!isAdmin()){alert('Sirf Admin is action ko use kar sakta hai.');return false}return true}
 
   window.requireAdmin=requireAdmin;
-  window.StockHeavenAuth={session:()=>currentSession,role,isAdmin,isGuest,logout,loginAdmin,loginGuest,guestCredentials,saveGuestCredentials,guestUsers,createGuestUser,deleteGuestUser,getLoginLog,clearLoginLog,restrictions:getRestrictions,saveRestrictions,ready,isPageAllowedForGuest:async file=>{const r=await getRestrictions();return !r[file]}};
+  window.StockHeavenAuth={session:()=>currentSession,role,isAdmin,isGuest,logout,loginAdmin,loginGuest,guestCredentials,saveGuestCredentials,guestUsers,createGuestUser,deleteGuestUser,updateGuestPassword,getLoginLog,clearLoginLog,restrictions:getRestrictions,saveRestrictions,ready,isPageAllowedForGuest:async file=>{const r=await getRestrictions();return !r[file]}};
 
   function injectTopbar(){
     const header=document.querySelector('.top-header'); if(!header||document.querySelector('.auth-topbar')||!currentSession)return;
@@ -69,6 +70,17 @@
   }
   function showAuthError(message){document.documentElement.style.visibility='visible';document.body.innerHTML='<div class="auth-page-lock"><div class="auth-page-lock-card"><i class="fa-solid fa-triangle-exclamation"></i><h2>Authentication Error</h2><p>'+String(message).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</p><button onclick="location.reload()">Retry</button></div></div>'}
   function lockPage(message='Page Restricted'){document.documentElement.style.visibility='hidden';window.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.visibility='visible';document.body.innerHTML='<div class="auth-page-lock"><div class="auth-page-lock-card"><i class="fa-solid fa-lock"></i><h2>'+message+'</h2><p>Admin ne is page ko Guest ke liye restrict kiya hai.</p><a href="index.html">Back to Dashboard</a></div></div>'},{once:true})}
+  async function hideRestrictedGuestNavigation(){
+    if(!isGuest())return;
+    try{
+      const restrictions=await getRestrictions();
+      document.querySelectorAll('a.nav-item[href]').forEach(link=>{
+        const raw=(link.getAttribute('href')||'').split('#')[0];
+        const file=raw.split('/').pop()||'index.html';
+        if(restrictions[file]){link.hidden=true;link.setAttribute('aria-hidden','true');}
+      });
+    }catch(_){/* Keep navigation intact if restriction lookup fails. */}
+  }
   function disableGuestEditing(){
     if(!isGuest())return;
     const selectors=['.stuck-edit','.stuck-delete','.stuck-save','.stuck-cancel','.alert-input','.action-edit','.action-delete','.action-save','.action-cancel','.fav-note-stock','.fav-remove-stock','.fav-card-actions button:not(:first-child)','.fav-add-stock','[data-admin-only]'];
@@ -84,7 +96,7 @@
       if(currentFile==='admin.html'&&s.role!=='admin'){readyResolve(s);lockPage('Admin Only');return}
       if(s.role==='guest'&&pages[currentFile]){const restrictions=await getRestrictions();if(restrictions[currentFile]){readyResolve(s);lockPage();return}}
       readyResolve(s);
-      const boot=()=>{injectTopbar();disableGuestEditing()};
+      const boot=()=>{injectTopbar();disableGuestEditing();hideRestrictedGuestNavigation()};
       if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
       startGuestTimer();
       setupActivityTracking();

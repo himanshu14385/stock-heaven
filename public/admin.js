@@ -18,7 +18,16 @@
     try{
       const data=await window.StockHeavenAuth.guestUsers();const users=data.users||[];
       if(!users.length){box.innerHTML='<div class="guest-users-empty"><i class="fa-regular fa-user"></i><span>Abhi koi guest user nahi hai.</span></div>';return}
-      box.innerHTML=`<div class="guest-users-table-wrap"><table class="guest-users-table"><thead><tr><th>#</th><th>Username</th><th>Created</th><th>Action</th></tr></thead><tbody>${users.map((u,i)=>`<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${u.createdAt?new Date(u.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td><td><button class="guest-delete-btn" type="button" data-guest-delete="${Number(u.id)}" data-guest-name="${esc(u.username)}" aria-label="Delete ${esc(u.username)}"><i class="fa-solid fa-trash-can"></i><span>Delete</span></button></td></tr>`).join('')}</tbody></table></div>`;
+      box.innerHTML=`<div class="guest-users-table-wrap"><table class="guest-users-table"><thead><tr><th>#</th><th>Username</th><th>Created</th><th>Action</th></tr></thead><tbody>${users.map((u,i)=>`<tr><td>${i+1}</td><td><b>${esc(u.username)}</b></td><td>${u.createdAt?new Date(u.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—'}</td><td><button class="guest-password-btn" type="button" data-guest-password="${Number(u.id)}" data-guest-name="${esc(u.username)}" aria-label="Edit password for ${esc(u.username)}"><i class="fa-solid fa-key"></i><span>Edit Password</span></button> <button class="guest-delete-btn" type="button" data-guest-delete="${Number(u.id)}" data-guest-name="${esc(u.username)}" aria-label="Delete ${esc(u.username)}"><i class="fa-solid fa-trash-can"></i><span>Delete</span></button></td></tr>`).join('')}</tbody></table></div>`;
+      box.querySelectorAll('[data-guest-password]').forEach(btn=>btn.addEventListener('click',async()=>{
+        const id=Number(btn.dataset.guestPassword),name=btn.dataset.guestName;
+        const password=prompt(`${name} ke liye naya password enter karein:`);
+        if(password===null)return;
+        if(!password){$('guestUserNote').textContent='Password blank nahi ho sakta.';return}
+        btn.disabled=true;try{await window.StockHeavenAuth.updateGuestPassword(id,password);$('guestUserNote').textContent=`${name} ka password update ho gaya.`}
+        catch(e){$('guestUserNote').textContent=e.message||'Password update nahi hua.'}
+        finally{btn.disabled=false}
+      }));
       box.querySelectorAll('[data-guest-delete]').forEach(btn=>btn.addEventListener('click',async()=>{
         const id=Number(btn.dataset.guestDelete),name=btn.dataset.guestName;
         if(!Number.isInteger(id)||id<1||!confirm(`Guest user “${name}” ko delete karna hai?`))return;
@@ -32,7 +41,7 @@
       await renderRestrictions();await renderLog();await loadGuestUsers();
       $('guestUserForm').onsubmit=async e=>{
         e.preventDefault();const username=$('guestUsername').value.trim(),password=$('guestPassword').value,note=$('guestUserNote'),submit=e.submitter||$('guestUserForm').querySelector('[type="submit"]');
-        if(username.length<3||password.length<4){note.textContent='Username min 3 aur password min 4 characters.';return}
+        if(username.length<3||!password){note.textContent='Username kam se kam 3 characters aur password required hai.';return}
         submit.disabled=true;note.textContent='Creating…';
         try{await window.StockHeavenAuth.createGuestUser(username,password);$('guestPassword').value='';note.textContent='Guest user created';await loadGuestUsers()}
         catch(err){note.textContent=err.message||'Unable to create guest user.'}
