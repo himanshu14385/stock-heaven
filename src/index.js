@@ -556,7 +556,7 @@ async function authJson(request,env,url){
     if(request.method==='POST'){
       let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
       const username=String(b.username||'').trim(),password=String(b.password||'');
-      if(username.length<3||username.length>80||!password)return json({error:'Username kam se kam 3 characters ka aur password required hai.'},400);
+      if(username.length<2||username.length>80||!password)return json({error:'Username kam se kam 2 characters ka aur password required hai.'},400);
       const hp=await passwordHash(password);
       try{
         const result=await env.AUTH_DB.prepare(`INSERT INTO guest_users (username,password_hash,password_salt,created_at) VALUES (?,?,?,?)`).bind(username,hp.hash,hp.salt,nowIso()).run();
@@ -598,7 +598,7 @@ async function authJson(request,env,url){
     if(request.method==='POST'){
       let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
       const u=String(b.username||'').trim(),p=String(b.password||'');
-      if(u.length<3||p.length<4)return json({error:'Username min 3 and password min 4 characters'},400);
+      if(u.length<2||!p)return json({error:'Username min 2 characters and password required'},400);
       const hp=await passwordHash(p),old=await env.AUTH_DB.prepare(`SELECT id,username FROM guest_users ORDER BY id LIMIT 1`).first();
       try{
         if(old){await env.AUTH_DB.prepare(`UPDATE guest_users SET username=?,password_hash=?,password_salt=? WHERE id=?`).bind(u,hp.hash,hp.salt,old.id).run();await env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest' AND username=?`).bind(old.username).run();}
