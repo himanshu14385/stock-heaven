@@ -41,7 +41,7 @@
       await renderRestrictions();await renderLog();await loadGuestUsers();
       $('guestUserForm').onsubmit=async e=>{
         e.preventDefault();const username=$('guestUsername').value.trim(),password=$('guestPassword').value,note=$('guestUserNote'),submit=e.submitter||$('guestUserForm').querySelector('[type="submit"]');
-        if(username.length<3||!password){note.textContent='Username kam se kam 3 characters aur password required hai.';return}
+        if(username.length<2||!password){note.textContent='Username kam se kam 2 characters aur password required hai.';return}
         submit.disabled=true;note.textContent='Creating…';
         try{await window.StockHeavenAuth.createGuestUser(username,password);$('guestPassword').value='';note.textContent='Guest user created';await loadGuestUsers()}
         catch(err){note.textContent=err.message||'Unable to create guest user.'}
