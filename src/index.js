@@ -556,13 +556,26 @@ async function authJson(request,env,url){
     if(request.method==='POST'){
       let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
       const username=String(b.username||'').trim(),password=String(b.password||'');
-      if(username.length<3||username.length>80||password.length<4||password.length>256)return json({error:'Username 3–80 aur password 4–256 characters ka hona chahiye.'},400);
+      if(username.length<3||username.length>80||!password)return json({error:'Username kam se kam 3 characters ka aur password required hai.'},400);
       const hp=await passwordHash(password);
       try{
         const result=await env.AUTH_DB.prepare(`INSERT INTO guest_users (username,password_hash,password_salt,created_at) VALUES (?,?,?,?)`).bind(username,hp.hash,hp.salt,nowIso()).run();
         return json({ok:true,id:result.meta?.last_row_id,username});
       }catch(e){if(String(e?.message||e).toLowerCase().includes('unique'))return json({error:'Ye username pehle se maujood hai.'},409);throw e;}
     }
+  }
+  const guestPasswordMatch=url.pathname.match(/^\/api\/admin\/guest-users\/(\d+)\/password$/);
+  if(guestPasswordMatch&&request.method==='POST'){
+    if(!await requireAdmin(request,env))return json({error:'Admin only'},403);
+    const id=Number(guestPasswordMatch[1]);let b={};try{b=await request.json()}catch(_){return json({error:'Invalid request'},400)}
+    const password=String(b.password??'');if(!password)return json({error:'Password required'},400);
+    const user=await env.AUTH_DB.prepare(`SELECT username FROM guest_users WHERE id=?`).bind(id).first();if(!user)return json({error:'Guest user not found'},404);
+    const hp=await passwordHash(password);
+    await env.AUTH_DB.batch([
+      env.AUTH_DB.prepare(`UPDATE guest_users SET password_hash=?,password_salt=? WHERE id=?`).bind(hp.hash,hp.salt,id),
+      env.AUTH_DB.prepare(`DELETE FROM auth_sessions WHERE role='guest' AND username=?`).bind(user.username)
+    ]);
+    return json({ok:true,id});
   }
   const guestDeleteMatch=url.pathname.match(/^\/api\/admin\/guest-users\/(\d+)$/);
   if(guestDeleteMatch&&request.method==='DELETE'){
