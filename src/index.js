@@ -830,6 +830,22 @@ async function dataJson(request,env,url){
     if(request.method==='GET')return json({items:await getStuckData(env)});
     if(!admin)return json({error:'Admin only'},403);
 
+    if(request.method==='POST'){
+      let b={};
+      try{b=await request.json()}catch(_){return json({error:'Invalid request'},400);}
+      const symbol=String(b.symbol||'').trim().toUpperCase();
+      const name=String(b.name||symbol).trim();
+      const quantity=Number(b.quantity);
+      const buyPrice=Number(b.buyPrice);
+      if(!symbol)return json({error:'Stock symbol is required'},400);
+      if(!name)return json({error:'Stock name is required'},400);
+      if(!Number.isFinite(quantity)||quantity<=0)return json({error:'Valid quantity is required'},400);
+      if(!Number.isFinite(buyPrice)||buyPrice<=0)return json({error:'Valid buy price is required'},400);
+      const next=await env.AUTH_DB.prepare(`SELECT COALESCE(MAX(sort_order),-1)+1 AS next_order FROM stuck_stocks`).first();
+      await env.AUTH_DB.prepare(`INSERT INTO stuck_stocks(symbol,name,quantity,buy_price,sort_order) VALUES (?,?,?,?,?)`).bind(symbol,name,quantity,buyPrice,Number(next?.next_order||0)).run();
+      return json({ok:true,items:await getStuckData(env)});
+    }
+
     if(request.method==='PATCH'){
       let b={};
       try{b=await request.json()}catch(_){return json({error:'Invalid request'},400);}
